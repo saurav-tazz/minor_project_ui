@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:quiz_duel/pages/homescreen.dart';
-import 'package:quiz_duel/pages/rough.dart';
+import 'package:quiz_duel/pages/resultscreen.dart';
 
 class MatchRoomScreen extends StatefulWidget {
   final List<String> genres;

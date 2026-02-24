@@ -5,7 +5,7 @@ import 'pages/splash.dart';
 import 'pages/matchroom.dart';
 import 'pages/homescreen.dart';
 import 'pages/profile.dart';
-import 'pages/rough.dart';
+import 'pages/resultscreen.dart';
 
 void main() {
   runApp(const QuizDuel());
@@ -25,9 +25,9 @@ class QuizDuel extends StatelessWidget {
         '/': (context) => const SplashScreen(),
         '/auth': (context) => const AuthScreen(),
         '/genre': (context) => const GenreScreen(),
+
         // '/home': (context) => const HomeScreen(),
         // '/rough': (context) => const ResultScreen(),
-
       },
       onGenerateRoute: (settings) {
         if (settings.name == '/matchroom') {
@@ -48,15 +48,18 @@ class QuizDuel extends StatelessWidget {
             builder: (context) => HomeScreen(genres: args),
           );
         }
-        if (settings.name == '/rough') {
-          final args = settings.arguments as List<String>; // list of 10 questions
+        if (settings.name == '/resultscreen') {
+          final args = settings.arguments as Map<String, dynamic>;
           return MaterialPageRoute(
-            builder: (context) => QuestionSelectionScreen(questions: args),
+            builder: (context) => ResultScreen(
+              score: args['score'] as int,
+              totalQuestions: args['totalQuestions'] as int,
+              genres: List<String>.from(args['genres']),
+            ),
           );
         }
         return null;
       },
-
     );
   }
 }
