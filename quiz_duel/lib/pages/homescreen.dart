@@ -6,11 +6,11 @@ class HomeScreen extends StatelessWidget {
   final List<String> genres;
   const HomeScreen({super.key, required this.genres});
 
-  void _navigateTo(BuildContext context, String route, List<String>? genres) {
+  void _navigateTo(BuildContext context, String route, Object? args) {
     Navigator.pushNamed(
       context,
       route,
-      arguments: genres,
+      arguments: args,
     );
   }
 
@@ -47,7 +47,16 @@ class HomeScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.person, color: Colors.white,),
             onPressed: () {
-              _navigateTo(context, '/profile', genres); // future profile screen
+              _navigateTo(context, '/profile', {
+                'username': 'Player123',
+                'tier': 'Intermediate',
+                'points': 1845,
+                'matchesPlayed': 47,
+                'wins': 28,
+                'draws': 5,
+                'losses': 14,
+                'genres': genres,
+              }); // future profile screen
             },
           ),
         ],
@@ -77,12 +86,21 @@ class HomeScreen extends StatelessWidget {
               Icons.school,
                   () => _navigateTo(context, '/matchroom', genres),
             ),
-            _buildModeCard(
-              context,
-              "Profile",
-              Icons.person,
-                  () => _navigateTo(context, '/profile', genres),
-            ),
+            // _buildModeCard(
+            //   context,
+            //   "Profile",
+            //   Icons.person,
+            //       () => _navigateTo(context, '/profile', {
+            //         'username': 'Player123',
+            //         'tier': 'Intermediate',
+            //         'points': 1845,
+            //         'matchesPlayed': 47,
+            //         'wins': 28,
+            //         'draws': 5,
+            //         'losses': 14,
+            //         'genres': genres,
+            //       })
+            // ),
           ],
         ),
       ),

@@ -6,6 +6,7 @@ import 'pages/matchroom.dart';
 import 'pages/homescreen.dart';
 import 'pages/profile.dart';
 import 'pages/resultscreen.dart';
+// import 'pages/rough.dart';
 
 void main() {
   runApp(const QuizDuel());
@@ -37,9 +38,18 @@ class QuizDuel extends StatelessWidget {
           );
         }
         if (settings.name == '/profile') {
-          final args = settings.arguments as List<String>;
+          final args = settings.arguments as Map<String, dynamic>;
           return MaterialPageRoute(
-            builder: (context) => ProfileScreen(genres: args),
+            builder: (context) => ProfileScreen(
+              username: args['username'],
+              tier: args['tier'],
+              points: args['points'],
+              matchesPlayed: args['matchesPlayed'],
+              wins: args['wins'],
+              draws: args['draws'],
+              losses: args['losses'],
+              genres: args['genres'],
+            ),
           );
         }
         if (settings.name == '/home') {
@@ -48,14 +58,19 @@ class QuizDuel extends StatelessWidget {
             builder: (context) => HomeScreen(genres: args),
           );
         }
+        // if (settings.name == '/resultscreen') {
+        //   final args = settings.arguments as Map<String, dynamic>;
+        //   return MaterialPageRoute(
+        //     builder: (context) => ResultScreen(
+        //       score: args['score'] as int,
+        //       totalQuestions: args['totalQuestions'] as int,
+        //       genres: List<String>.from(args['genres']),
+        //     ),
+        //   );
+        // }
         if (settings.name == '/resultscreen') {
-          final args = settings.arguments as Map<String, dynamic>;
           return MaterialPageRoute(
-            builder: (context) => ResultScreen(
-              score: args['score'] as int,
-              totalQuestions: args['totalQuestions'] as int,
-              genres: List<String>.from(args['genres']),
-            ),
+            builder: (context) => const ResultScreen(),
           );
         }
         return null;

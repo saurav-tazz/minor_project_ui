@@ -9,16 +9,16 @@ class GenreScreen extends StatefulWidget {
 
 class _GenreScreenState extends State<GenreScreen> {
   final List<Map<String, dynamic>> genres = [
-    {'title': 'Science', 'icon': Icons.science},
-    {'title': 'History', 'icon': Icons.menu_book},
-    {'title': 'Geography', 'icon': Icons.public},
-    {'title': 'Movies & TV', 'icon': Icons.movie},
-    {'title': 'Music', 'icon': Icons.music_note},
-    {'title': 'Gaming', 'icon': Icons.sports_esports},
-    {'title': 'Sports', 'icon': Icons.emoji_events},
-    {'title': 'General Knowledge', 'icon': Icons.lightbulb},
-    {'title': 'Technology', 'icon': Icons.computer},
-    {'title': 'Art & Culture', 'icon': Icons.palette},
+    {'title': 'Society & Culture', 'icon': Icons.science},
+    {'title': 'Science & Mathematics', 'icon': Icons.menu_book},
+    {'title': 'Health', 'icon': Icons.public},
+    {'title': 'Education & Reference', 'icon': Icons.movie},
+    {'title': 'Computers & Internet', 'icon': Icons.music_note},
+    {'title': 'Sports', 'icon': Icons.sports_esports},
+    {'title': 'Business & Finance', 'icon': Icons.emoji_events},
+    {'title': 'Entertainment & Music', 'icon': Icons.lightbulb},
+    {'title': 'Family & Relationships', 'icon': Icons.computer},
+    {'title': 'Politics & Government', 'icon': Icons.palette},
   ];
 
   final List<int> selectedIndexes = [];

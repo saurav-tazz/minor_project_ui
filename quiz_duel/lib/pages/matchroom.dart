@@ -82,15 +82,18 @@ class _MatchRoomScreenState extends State<MatchRoomScreen> {
         // ScaffoldMessenger.of(context).showSnackBar(
         //   SnackBar(content: Text("Match finished! Final score: $playerScore")),
         // );
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ResultScreen(
-              score: playerScore,
-              totalQuestions: questions.length,
-              genres: widget.genres,
-            ),
-          ),
+        // Navigator.pushReplacement(
+        //   context,
+        //   MaterialPageRoute(
+        //     builder: (context) => ResultScreen(
+        //       score: playerScore,
+        //       totalQuestions: questions.length,
+        //       genres: widget.genres,
+        //     ),
+        //   ),
+        // );
+        Navigator.pushReplacement(context,
+          MaterialPageRoute(builder: (_) => const ResultScreen()),
         );
       }
     });
