@@ -185,7 +185,7 @@ class _AuthScreenState extends State<AuthScreen> {
               text: "Login",
               onPressed: () {
                 // print('Logged IN');
-                Navigator.pushReplacementNamed(context, '/genre');
+                Navigator.pushReplacementNamed(context, '/genres');
               },
               fontSize: 24,
             )
@@ -284,6 +284,8 @@ class _AuthScreenState extends State<AuthScreen> {
               text: "Register",
               onPressed: () {
                 print('Registered');
+                Navigator.pushReplacementNamed(context, '/genre');
+
               },
               fontSize: 24,
             ),

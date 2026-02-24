@@ -6,7 +6,7 @@ import 'pages/matchroom.dart';
 import 'pages/homescreen.dart';
 import 'pages/profile.dart';
 import 'pages/resultscreen.dart';
-// import 'pages/rough.dart';
+import 'pages/questionSelection.dart';
 
 void main() {
   runApp(const QuizDuel());
@@ -28,7 +28,7 @@ class QuizDuel extends StatelessWidget {
         '/genre': (context) => const GenreScreen(),
 
         // '/home': (context) => const HomeScreen(),
-        // '/rough': (context) => const ResultScreen(),
+        '/questionSelection': (context) => const QuestionSelectionScreen(genres: [],),
       },
       onGenerateRoute: (settings) {
         if (settings.name == '/matchroom') {
@@ -69,9 +69,7 @@ class QuizDuel extends StatelessWidget {
         //   );
         // }
         if (settings.name == '/resultscreen') {
-          return MaterialPageRoute(
-            builder: (context) => const ResultScreen(),
-          );
+          return MaterialPageRoute(builder: (context) => const ResultScreen());
         }
         return null;
       },

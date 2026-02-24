@@ -72,7 +72,7 @@ class HomeScreen extends StatelessWidget {
               context,
               "Quick Match",
               Icons.flash_on,
-                  () => _navigateTo(context, '/matchroom', genres),
+                  () => _navigateTo(context, '/questionSelection', genres),
             ),
             _buildModeCard(
               context,
