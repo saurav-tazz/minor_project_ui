@@ -22,7 +22,6 @@ void main() async {
   ApiService.init(baseUrl: activeBackendIp);
 
   // 3. Initialize Socket connection
-  // Ensure your SocketService.connect() method accepts a URL string!
   await SocketService.instance.connect(activeBackendIp);
 
   runApp(const QuizDuel());
@@ -41,16 +40,24 @@ class QuizDuel extends StatelessWidget {
         '/': (context) => const SplashScreen(),
         '/auth': (context) => const AuthScreen(),
         '/genre': (context) => const GenreScreen(),
-        '/questionSelection': (context) =>
-            const QuestionSelectionScreen(genres: []),
       },
       onGenerateRoute: (settings) {
+        // --- MATCHROOM ROUTE ---
         if (settings.name == '/matchroom') {
-          final args = settings.arguments as List<String>;
+          final args = settings.arguments as Map<String, dynamic>;
           return MaterialPageRoute(
-            builder: (context) => MatchRoomScreen(genres: args),
+            builder: (context) => PlayScreen(
+              // This is the class name inside matchroom.dart
+              questions: args['questions'] ?? [],
+              roomId: args['roomId'] ?? '',
+              userId: args['userId'] ?? '',
+              socket: SocketService.instance.socket,
+              genres: args['genres'],
+            ),
           );
         }
+
+        // --- PROFILE ROUTE ---
         if (settings.name == '/profile') {
           final args = settings.arguments as Map<String, dynamic>;
           return MaterialPageRoute(
@@ -63,18 +70,48 @@ class QuizDuel extends StatelessWidget {
               draws: args['draws'],
               losses: args['losses'],
               genres: args['genres'],
+              socket:
+                  SocketService.instance.socket, // Real-time listener instance
             ),
           );
         }
+
+        // --- HOME ROUTE ---
         if (settings.name == '/home') {
-          final args = settings.arguments as List<String>;
+          final args = settings.arguments as Map<String, dynamic>;
           return MaterialPageRoute(
-            builder: (context) => HomeScreen(genres: args),
+            builder: (context) => HomeScreen(
+              genres: List<String>.from(args['genres'] ?? []),
+              userData: args,
+            ),
           );
         }
-        if (settings.name == '/resultscreen') {
-          return MaterialPageRoute(builder: (context) => const ResultScreen());
+
+        // --- QUESTION SELECTION ROUTE ---
+        if (settings.name == '/questionSelection') {
+          final args = settings.arguments as Map<String, dynamic>;
+          return MaterialPageRoute(
+            builder: (context) => QuestionSelectionScreen(
+              inventory: args['inventory'],
+              roomId: args['roomId'],
+              userId: args['userId'],
+              socket: SocketService.instance.socket,
+              genres: args['genres'],
+            ),
+          );
         }
+
+        // --- RESULTS ROUTE ---
+        if (settings.name == '/resultscreen') {
+          final args = settings.arguments as Map<String, dynamic>;
+          return MaterialPageRoute(
+            builder: (context) => ResultScreen(
+              gameResults: args,
+              socket: SocketService.instance.socket,
+            ),
+          );
+        }
+
         return null;
       },
     );
