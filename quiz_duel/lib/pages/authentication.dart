@@ -25,7 +25,7 @@ class _AuthScreenState extends State<AuthScreen> {
   final TextEditingController _regPasswordController = TextEditingController();
 
   // 🔹 Use your active backend IP (Synced with main.dart)
-  static const String baseUrl = "http://192.168.168.112:4000";
+  static const String baseUrl = "https://quiz-royale-ash0.onrender.com";
   Future<void> _handleAuth(bool isLogin) async {
     setState(() => _isLoading = true);
 

@@ -51,7 +51,9 @@ class _GenreScreenState extends State<GenreScreen> {
           .toList();
 
       final response = await http.post(
-        Uri.parse('http://192.168.168.112:4000/api/users/update-genres'),
+        Uri.parse(
+          'https://quiz-royale-ash0.onrender.com/api/users/update-genres',
+        ),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'userId': userId,

@@ -16,7 +16,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // 1. UPDATE THIS IP: This is the address of your Backend Laptop
-  const String activeBackendIp = "http://192.168.168.112:4000";
+  const String activeBackendIp = "https://quiz-royale-ash0.onrender.com/api";
 
   // 2. Initialize ApiService with the new IP
   ApiService.init(baseUrl: activeBackendIp);
