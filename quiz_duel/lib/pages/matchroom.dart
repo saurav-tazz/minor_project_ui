@@ -7,7 +7,7 @@ class PlayScreen extends StatefulWidget {
   final String roomId;
   final String userId;
   final dynamic socket;
-  final List<String>? genres;
+  final List<int>? genres;
 
   const PlayScreen({
     super.key,

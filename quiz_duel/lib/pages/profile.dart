@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 class ProfileScreen extends StatefulWidget {
+  final String userId;
   final String username;
   final String tier; // "Noob", "Intermediate", "Pro"
   final int points;
@@ -8,11 +9,12 @@ class ProfileScreen extends StatefulWidget {
   final int wins;
   final int draws;
   final int losses;
-  final List<String> genres;
+  final List<int> genres;
   final dynamic socket; // Passed from navigation for real-time updates
 
   const ProfileScreen({
     super.key,
+    required this.userId,
     required this.username,
     required this.tier,
     required this.points,
@@ -36,11 +38,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
   late int currentWins;
   late int currentDraws;
   late int currentLosses;
+  final Map<int, String> genreLabels = const {
+    0: 'Society & Culture',
+    1: 'Science & Mathematics',
+    2: 'Health',
+    3: 'Education & Reference',
+    4: 'Computers & Internet',
+    5: 'Sports',
+    6: 'Business & Finance',
+    7: 'Entertainment & Music',
+    8: 'Family & Relationships',
+    9: 'Politics & Government',
+  };
+  late List<int> selectedGenres;
 
   @override
   void initState() {
     super.initState();
     _initializeStats();
+    selectedGenres = List.from(widget.genres); // local copy for editing
 
     // 🔹 LISTENER: Handle Real-time Stats Updates from the Server
     widget.socket.on('stats_update', (data) {
@@ -214,11 +230,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
                       TextButton(
-                        onPressed: () {},
-                        child: const Text(
-                          "Edit",
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
+                        onPressed: _editGenres,
+                        child: const Text("Edit"),
                       ),
                     ],
                   ),
@@ -226,23 +239,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Wrap(
                     spacing: 10,
                     runSpacing: 10,
-                    children: widget.genres
-                        .map(
-                          (g) => Chip(
-                            label: Text(g),
-                            backgroundColor: Colors.white,
-                            side: const BorderSide(color: Color(0xFFE0E0E0)),
-                            labelStyle: const TextStyle(
-                              color: Color(0xFF1E88E5),
-                              fontWeight: FontWeight.bold,
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 5,
-                            ),
-                          ),
-                        )
-                        .toList(),
+                    children: selectedGenres.map((g) {
+                      final label = genreLabels[g] ?? "Unknown";
+                      return Chip(
+                        label: Text(label),
+                        backgroundColor: Colors.white,
+                        side: const BorderSide(color: Color(0xFFE0E0E0)),
+                        labelStyle: const TextStyle(
+                          color: Color(0xFF1E88E5),
+                          fontWeight: FontWeight.bold,
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                      );
+                    }).toList(),
                   ),
                   const SizedBox(height: 50),
                 ],
@@ -252,6 +264,118 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
     );
+  }
+
+  // void _syncGenresWithServer(List<int> genres) {
+  //   widget.socket.emit('update_genres', {'genres': genres});
+
+  //   ScaffoldMessenger.of(context).showSnackBar(
+  //     const SnackBar(
+  //       content: Text("Genres updated successfully ✅"),
+  //       duration: Duration(seconds: 2),
+  //       behavior: SnackBarBehavior.floating,
+  //     ),
+  //   );
+  // }
+  void _syncGenresWithServer(List<int> genres) {
+    final payload = {
+      'userId': widget.userId, // ✅ pass the user ID
+      'preferredGenres': genres,
+    };
+
+    widget.socket.emit('update_genres', payload, (response) {
+      // This callback receives ack from the server
+      if (response != null && response['success'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Genres updated successfully ✅"),
+            duration: Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              "Failed to update genres: ${response?['message'] ?? 'Unknown error'}",
+            ),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    });
+  }
+
+  void _editGenres() async {
+    final List<int> allGenres = genreLabels.keys.toList();
+    final Set<int> selected = Set<int>.from(selectedGenres); // use local copy
+
+    final result = await showDialog<List<int>>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Edit Favorite Genres"),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: StatefulBuilder(
+              builder: (context, setStateDialog) {
+                return ListView(
+                  shrinkWrap: true,
+                  children: allGenres.map((g) {
+                    return CheckboxListTile(
+                      title: Text(genreLabels[g]!),
+                      value: selected.contains(g),
+                      onChanged: (val) {
+                        setStateDialog(() {
+                          if (val == true) {
+                            // If you want to enforce a max of 3 genres, uncomment below:
+                            // if (selected.length < 3) {
+                            //   selected.add(g);
+                            // } else {
+                            //   ScaffoldMessenger.of(context).showSnackBar(
+                            //     const SnackBar(
+                            //       content: Text("Maximum 3 genres allowed"),
+                            //       duration: Duration(seconds: 2),
+                            //     ),
+                            //   );
+                            // }
+
+                            // For now, allow any number of genres:
+                            selected.add(g);
+                          } else {
+                            selected.remove(g);
+                          }
+                        });
+                      },
+                    );
+                  }).toList(),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, selected.toList()),
+              child: const Text("Save"),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result != null) {
+      // Update local state so Chips refresh immediately
+      setState(() {
+        selectedGenres = result;
+      });
+
+      // Persist changes to backend
+      _syncGenresWithServer(result);
+    }
   }
 
   Widget _tierBadge(String tier) {

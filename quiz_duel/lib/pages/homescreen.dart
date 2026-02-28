@@ -3,7 +3,7 @@ import 'package:quiz_duel/widgets/logo.dart';
 import 'package:quiz_duel/services/socket_service.dart';
 
 class HomeScreen extends StatelessWidget {
-  final List<String> genres;
+  final List<int> genres;
   // userData contains: _id, name, email, level, genres, stats: {wins, losses, etc}
   final Map<String, dynamic> userData;
 
@@ -40,6 +40,7 @@ class HomeScreen extends StatelessWidget {
             onPressed: () {
               // Passing actual user data AND the socket instance for real-time updates
               _navigateTo(context, '/profile', {
+                'userId': userData['_id'],
                 'username': username,
                 'tier': level,
                 'points': stats['totalPoints'] ?? 0,

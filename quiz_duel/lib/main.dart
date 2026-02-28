@@ -62,6 +62,7 @@ class QuizDuel extends StatelessWidget {
           final args = settings.arguments as Map<String, dynamic>;
           return MaterialPageRoute(
             builder: (context) => ProfileScreen(
+              userId: args['userId'],
               username: args['username'],
               tier: args['tier'],
               points: args['points'],
@@ -81,7 +82,7 @@ class QuizDuel extends StatelessWidget {
           final args = settings.arguments as Map<String, dynamic>;
           return MaterialPageRoute(
             builder: (context) => HomeScreen(
-              genres: List<String>.from(args['genres'] ?? []),
+              genres: List<int>.from(args['genres'] ?? []),
               userData: args,
             ),
           );
