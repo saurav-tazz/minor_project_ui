@@ -87,7 +87,7 @@ class HomeScreen extends StatelessWidget {
                     "Find Opponent",
                     Icons.flash_on,
                     const Color(0xFF1E88E5),
-                    () => _navigateTo(context, '/matchroom', {
+                    () => _navigateTo(context, '/loadingscreen', {
                       'userId': userData['_id'],
                       'genres': genres,
                     }),

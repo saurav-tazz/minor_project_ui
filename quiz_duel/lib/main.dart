@@ -7,6 +7,7 @@ import 'package:quiz_duel/pages/homescreen.dart';
 import 'package:quiz_duel/pages/profile.dart';
 import 'package:quiz_duel/pages/resultscreen.dart';
 import 'package:quiz_duel/pages/questionSelection.dart';
+import 'package:quiz_duel/pages/loadingscreen.dart';
 
 // Import backend services
 import 'package:quiz_duel/services/socket_service.dart';
@@ -40,6 +41,16 @@ class QuizDuel extends StatelessWidget {
         '/': (context) => const SplashScreen(),
         '/auth': (context) => const AuthScreen(),
         '/genre': (context) => const GenreScreen(),
+        '/loadingscreen': (context) => LoadingScreen(
+          userId: ModalRoute.of(context)!.settings.arguments != null
+              ? (ModalRoute.of(context)!.settings.arguments as Map)['userId']
+              : '',
+          genres: ModalRoute.of(context)!.settings.arguments != null
+              ? List<int>.from(
+                  (ModalRoute.of(context)!.settings.arguments as Map)['genres'],
+                )
+              : [],
+        ),
       },
       onGenerateRoute: (settings) {
         // --- MATCHROOM ROUTE ---
@@ -93,7 +104,7 @@ class QuizDuel extends StatelessWidget {
           final args = settings.arguments as Map<String, dynamic>;
           return MaterialPageRoute(
             builder: (context) => QuestionSelectionScreen(
-              inventory: args['inventory'],
+              // inventory: args['inventory'],
               roomId: args['roomId'],
               userId: args['userId'],
               socket: SocketService.instance.socket,
