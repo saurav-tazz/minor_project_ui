@@ -1,22 +1,23 @@
-import 'package:flutter/material.dart';
 import 'dart:async';
-import 'dart:math';
-import 'package:quiz_duel/pages/matchroom.dart'; // Ensure this matches your gameplay file name
+import 'package:flutter/material.dart';
+import 'package:socket_io_client/socket_io_client.dart' as IO;
 
 class QuestionSelectionScreen extends StatefulWidget {
-  final List<dynamic> inventory;
   final String roomId;
   final String userId;
-  final dynamic socket;
-  final List<String> genres;
+  final List<dynamic> inventory;
+  final int timer;
+  final IO.Socket socket;
+  final bool amIP1;
 
   const QuestionSelectionScreen({
     super.key,
-    required this.inventory,
     required this.roomId,
     required this.userId,
+    required this.inventory,
+    required this.timer,
     required this.socket,
-    required this.genres,
+    required this.amIP1,
   });
 
   @override
@@ -25,235 +26,96 @@ class QuestionSelectionScreen extends StatefulWidget {
 }
 
 class _QuestionSelectionScreenState extends State<QuestionSelectionScreen> {
-  static const int maxSelection = 5;
-  final Set<String> selectedIds = {};
-  int _timeLeft = 20;
+  List<String> selectedIds = [];
+  late int timeLeft;
   Timer? _timer;
-  bool isSubmitted = false;
+  bool _isWaiting = false; // To show waiting state after submission
 
   @override
   void initState() {
     super.initState();
-    startTimer();
+    timeLeft = widget.timer;
+    _startTimer();
 
-    // 🔹 LISTENER: Move to Battle when BOTH players are ready
+    // Listen for the server to confirm both players are ready to start the match
     widget.socket.on('start_duel', (data) {
       if (mounted) {
-        _timer?.cancel();
+        _timer?.cancel(); // Ensure timer is stopped
 
-        // Remove waiting overlay if it's currently showing
-        if (isSubmitted) {
-          Navigator.of(context, rootNavigator: true).pop();
-        }
-
-        // Logic: You play the 5 questions your opponent picked for you
-        bool isPlayerOne = widget.userId == data['p1UserId'];
-        List<dynamic> myQuestions = isPlayerOne
+        // Pick this player's questions based on which player they are
+        final myQuestions = widget.amIP1
             ? data['p1Questions']
             : data['p2Questions'];
 
-        Navigator.pushReplacement(
+        // Navigate to /matchroom using the arguments your main.dart expects
+        Navigator.pushReplacementNamed(
           context,
-          MaterialPageRoute(
-            builder: (_) => PlayScreen(
-              questions: myQuestions,
-              roomId: widget.roomId,
-              userId: widget.userId,
-              socket: widget.socket,
-            ),
-          ),
+          '/matchroom',
+          arguments: {
+            'roomId': widget.roomId,
+            'userId': widget.userId,
+            'questions': myQuestions, // Use the player-specific questions
+          },
         );
       }
     });
   }
 
-  void startTimer() {
+  void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_timeLeft > 0) {
-        setState(() => _timeLeft--);
+      if (timeLeft > 0) {
+        setState(() => timeLeft--);
       } else {
-        _timer?.cancel();
-        if (!isSubmitted) autoSubmit();
+        _submitSelection();
       }
     });
   }
 
-  void toggleSelection(String id) {
-    if (isSubmitted) return;
-    setState(() {
-      if (selectedIds.contains(id)) {
-        selectedIds.remove(id);
-      } else if (selectedIds.length < maxSelection) {
-        selectedIds.add(id);
-      }
-    });
-  }
-
-  void autoSubmit() {
-    final random = Random();
-    List<String> availableIds = widget.inventory
-        .map((q) => q['_id'].toString())
-        .where((id) => !selectedIds.contains(id))
-        .toList();
-
-    while (selectedIds.length < maxSelection && availableIds.isNotEmpty) {
-      final randomIndex = random.nextInt(availableIds.length);
-      selectedIds.add(availableIds[randomIndex]);
-      availableIds.removeAt(randomIndex);
-    }
-    submitSelection();
-  }
-
-  void submitSelection() {
-    if (isSubmitted) return;
-    setState(() => isSubmitted = true);
+  void _submitSelection() {
     _timer?.cancel();
-
+    // Integration with backend: matches the 'submit_selection' event [cite: 314]
     widget.socket.emit('submit_selection', {
       'roomId': widget.roomId,
       'userId': widget.userId,
-      'selectedIds': selectedIds.toList(),
+      'selectedIds': selectedIds,
     });
+    // Wait for start_duel socket event — navigation happens there
+    setState(() => _isWaiting = true);
 
-    _showWaitingOverlay();
-  }
-
-  void _showWaitingOverlay() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => WillPopScope(
-        onWillPop: () async => false,
-        child: Center(
-          child: Card(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
-            ),
-            child: const Padding(
-              padding: EdgeInsets.all(25),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  CircularProgressIndicator(color: Colors.orange),
-                  SizedBox(height: 20),
-                  Text(
-                    "Selection Locked!",
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    "Waiting for opponent...",
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+    //temporary navigation to matchroom for testing without backend
+    // Future.delayed(const Duration(milliseconds: 500), () {
+    //   if (mounted) {
+    //     Navigator.pushReplacementNamed(
+    //       context,
+    //       '/matchroom',
+    //       arguments: {
+    //         'roomId': widget.roomId,
+    //         'userId': widget.userId,
+    //         'questions': widget.inventory
+    //             .take(5)
+    //             .toList(), // Just take the first 5 from inventory as dummy data
+    //       },
+    //     );
+    //   }
+    // });
   }
 
   @override
   void dispose() {
     _timer?.cancel();
-    widget.socket.off('start_duel');
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final remaining = maxSelection - selectedIds.length;
-
-    return WillPopScope(
-      onWillPop: () async => false,
-      child: Scaffold(
-        backgroundColor: const Color(0xFF00A9FF),
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          automaticallyImplyLeading: false,
-          title: Text(
-            "STRATEGY: $_timeLeft s",
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          centerTitle: true,
-        ),
-        body: Column(
+    return Scaffold(
+      backgroundColor: const Color(0xFF00A3FF), // Match UI Blue
+      body: SafeArea(
+        child: Column(
           children: [
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              child: Text(
-                "Pick 5 questions to send to your opponent!",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-            _buildSelectionProgress(remaining),
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: widget.inventory.length,
-                itemBuilder: (context, index) {
-                  final q = widget.inventory[index];
-                  final String qId = q['_id'].toString();
-                  final isSelected = selectedIds.contains(qId);
-
-                  return GestureDetector(
-                    onTap: () => toggleSelection(qId),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      margin: const EdgeInsets.only(bottom: 10),
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? Colors.white
-                            : Colors.white.withOpacity(0.9),
-                        borderRadius: BorderRadius.circular(15),
-                        border: Border.all(
-                          color: isSelected
-                              ? Colors.orangeAccent
-                              : Colors.transparent,
-                          width: 3,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          _difficultyBadge(q['difficulty'] ?? 'easy'),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              q['questionText'] ?? '',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: isSelected
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                                color: Colors.black87,
-                              ),
-                            ),
-                          ),
-                          Icon(
-                            isSelected
-                                ? Icons.check_circle
-                                : Icons.add_circle_outline,
-                            color: isSelected
-                                ? Colors.orangeAccent
-                                : Colors.grey,
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
+            _buildHeader(),
+            _buildSelectionProgress(),
+            Expanded(child: _buildQuestionList()),
             _buildBottomButton(),
           ],
         ),
@@ -261,12 +123,42 @@ class _QuestionSelectionScreenState extends State<QuestionSelectionScreen> {
     );
   }
 
-  Widget _buildSelectionProgress(int remaining) {
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.all(20.0),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.lightbulb, color: Colors.yellow, size: 30),
+              const SizedBox(width: 10),
+              const Text(
+                "Select Questions",
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+          const Text(
+            "Choose 5 questions for your opponent",
+            style: TextStyle(color: Colors.white70, fontSize: 16),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSelectionProgress() {
+    double progress = selectedIds.length / 5;
     return Container(
-      margin: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(horizontal: 20),
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: Colors.black12,
+        color: Colors.white.withOpacity(0.2),
         borderRadius: BorderRadius.circular(15),
       ),
       child: Column(
@@ -275,76 +167,112 @@ class _QuestionSelectionScreenState extends State<QuestionSelectionScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                "Selected: ${selectedIds.length}/$maxSelection",
+                "Selected: ${selectedIds.length}/5",
+                style: const TextStyle(color: Colors.white),
+              ),
+              Text(
+                "⏳ ${timeLeft}s",
                 style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              Text(
-                remaining == 0 ? "Ready!" : "Pick $remaining more",
-                style: TextStyle(
-                  color: remaining == 0
-                      ? Colors.greenAccent
-                      : Colors.yellowAccent,
-                ),
-              ),
             ],
           ),
           const SizedBox(height: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: LinearProgressIndicator(
-              value: selectedIds.length / maxSelection,
-              minHeight: 8,
-              backgroundColor: Colors.white24,
-              valueColor: const AlwaysStoppedAnimation(Colors.white),
-            ),
+          LinearProgressIndicator(
+            value: progress,
+            backgroundColor: Colors.white24,
+            color: Colors.yellow,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildBottomButton() {
-    bool canSubmit = selectedIds.length == maxSelection;
-    return Padding(
+  Widget _buildQuestionList() {
+    return ListView.builder(
       padding: const EdgeInsets.all(20),
+      itemCount: widget.inventory.length,
+      itemBuilder: (context, index) {
+        final q = widget.inventory[index];
+        final id = q['_id'].toString();
+        final isSelected = selectedIds.contains(id);
+
+        return GestureDetector(
+          onTap: () {
+            setState(() {
+              if (isSelected) {
+                selectedIds.remove(id);
+              } else if (selectedIds.length < 5) {
+                selectedIds.add(id);
+              }
+            });
+          },
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 15),
+            padding: const EdgeInsets.all(15),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: isSelected
+                  ? Border.all(color: Colors.yellow, width: 3)
+                  : null,
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  isSelected ? Icons.check_circle : Icons.circle_outlined,
+                  color: isSelected ? Colors.green : Colors.grey,
+                ),
+                const SizedBox(width: 15),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        q['questionText'] ?? "No text",
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        "Difficulty: ${q['difficulty'] ?? 'Easy'}",
+                        style: TextStyle(color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildBottomButton() {
+    bool canSubmit = selectedIds.length == 5;
+    return Padding(
+      padding: const EdgeInsets.all(20.0),
       child: ElevatedButton(
-        onPressed: canSubmit ? submitSelection : null,
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.orangeAccent,
-          disabledBackgroundColor: Colors.white24,
-          minimumSize: const Size(double.infinity, 55),
+          backgroundColor: canSubmit ? Colors.yellow : Colors.white24,
+          minimumSize: const Size(double.infinity, 50),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(15),
           ),
         ),
-        child: const Text(
-          "SEND TO OPPONENT",
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-        ),
-      ),
-    );
-  }
-
-  Widget _difficultyBadge(String diff) {
-    Color color = diff.toLowerCase() == 'hard'
-        ? Colors.red
-        : (diff.toLowerCase() == 'medium' ? Colors.orange : Colors.green);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        diff.toUpperCase(),
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 10,
-          fontWeight: FontWeight.bold,
-        ),
+        onPressed: (canSubmit && !_isWaiting) ? _submitSelection : null,
+        child: _isWaiting
+            ? const CircularProgressIndicator(color: Colors.black)
+            : Text(
+                canSubmit
+                    ? "Confirm Selections"
+                    : "Select ${5 - selectedIds.length} More Questions",
+              ),
       ),
     );
   }

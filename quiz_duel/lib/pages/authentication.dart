@@ -111,7 +111,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     const Logo(size: 100),
                     const SizedBox(height: 16),
                     const Text(
-                      'Quiz Duel',
+                      'Quiz Royale',
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
@@ -163,7 +163,7 @@ class _AuthScreenState extends State<AuthScreen> {
   Widget _buildLogin() {
     return Column(
       children: [
-        _buildTextField(_loginEmailController, 'Email', Icons.email_outlined),
+        _buildTextField(_loginEmailController, 'Username', Icons.person),
         const SizedBox(height: 16),
         _buildTextField(
           _loginPasswordController,

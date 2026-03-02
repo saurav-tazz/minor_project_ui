@@ -65,7 +65,7 @@ class _SplashScreenState extends State<SplashScreen>
               ),
               const SizedBox(height: 20),
               Text(
-                'QuizDuel',
+                'QuizRoyale',
                 style: TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,

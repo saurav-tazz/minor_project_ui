@@ -1,0 +1,781 @@
+//matchmaking.js
+/**
+ * Calculates the Cosine Similarity between two vectors.
+ * In this app, vectors represent the player's genre preferences.
+ * Formula: (A · B) / (||A|| * ||B||)
+ */
+export const calculateSimilarity = (vecA, vecB) => {
+    // 1. Structural Validation
+    if (!vecA || !vecB || vecA.length === 0 || vecA.length !== vecB.length) {
+        return 0;
+    }
+
+    try {
+        // 2. Calculate Dot Product (A · B)
+        // Ensure values are treated as Numbers to prevent string concatenation
+        const dotProduct = vecA.reduce((sum, a, i) => {
+            return sum + (Number(a) * Number(vecB[i] || 0));
+        }, 0);
+
+        // 3. Calculate Magnitudes (||A|| and ||B||)
+        const magA = Math.sqrt(vecA.reduce((sum, a) => sum + (Number(a) * Number(a)), 0));
+        const magB = Math.sqrt(vecB.reduce((sum, b) => sum + (Number(b) * Number(b)), 0));
+
+        // 4. Avoid division by zero
+        if (magA === 0 || magB === 0) return 0;
+
+        // 5. Final Cosine Similarity Calculation
+        const similarity = dotProduct / (magA * magB);
+
+        // Clamping value between 0 and 1 for consistency
+        return Math.max(0, Math.min(1, similarity));
+        
+    } catch (error) {
+        console.error("Error in calculateSimilarity:", error);
+        return 0;
+    }
+};
+
+//Server.js
+import 'dotenv/config';
+import express from 'express';
+import fileUpload from 'express-fileupload';
+import { spawn } from 'child_process';
+import mongoose from 'mongoose';
+import readline from 'readline';
+import http from 'http';
+import cors from 'cors'; 
+import { createRequire } from 'module';
+import Question from './models/Question.js';
+import User from './models/User.js'; 
+import { initSocket } from './socket/socket.js';
+import path from 'path';
+
+const require = createRequire(import.meta.url);
+const pdf = require('pdf-parse');
+
+const app = express();
+const server = http.createServer(app);
+
+// --- 1. Middleware & Configuration ---
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'x-api-key']
+})); 
+
+app.use(express.json());
+app.use(express.static('public'));
+
+// FIXED: Auto-trimming middleware. This prevents "Invalid Credentials" 
+// errors caused by hidden spaces in Flutter/Postman inputs.
+app.use((req, res, next) => {
+    if (req.body && typeof req.body === 'object') {
+        for (const key in req.body) {
+            if (typeof req.body[key] === 'string') {
+                req.body[key] = req.body[key].trim();
+            }
+        }
+    }
+    next();
+});
+
+// --- 2. Security: API Key Guard ---
+const requireApiKey = (req, res, next) => {
+    const key = req.headers['x-api-key'];
+    if (key !== process.env.ADMIN_KEY) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+    next();
+};
+
+// --- 3. Public User Routes (For Flutter Integration) ---
+
+const publicRouter = express.Router();
+
+// Handle User Registration
+// Handle User Registration
+// --- server.js ---
+publicRouter.post('/register', async (req, res) => {
+    try {
+        const { username, password, email } = req.body; 
+        const existing = await User.findOne({ $or: [{ username }, { email }] });
+        if (existing) return res.status(400).json({ success: false, message: "Username already exists" });
+
+        const newUser = new User({ 
+            username, 
+            email, 
+            password, 
+            level: 'noob',
+            preferredGenres: [], 
+            stats: { matchesPlayed: 0, wins: 0, losses: 0, draws: 0, totalPoints: 0 }
+        });
+        
+        const savedUser = await newUser.save();
+
+        // MANDATORY: Return the user object so Flutter can navigate
+        res.status(201).json({ 
+            success: true, 
+            user: {
+                _id: savedUser._id.toString(), // Ensure ID is a string
+                name: savedUser.username,
+                email: savedUser.email,
+                level: savedUser.level,
+                genres: savedUser.preferredGenres || [],
+                stats: savedUser.stats
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// Handle User Login
+publicRouter.post('/login', async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        console.log(`Attempting login for: [${username}] with password: [${password}]`);
+        const user = await User.findOne({ username });
+        
+        if (!user || user.password !== password) {
+            return res.status(401).json({ success: false, message: "Invalid credentials" });
+        }
+
+        if (user.isBanned) {
+            return res.status(403).json({ success: false, message: "Account is banned" });
+        }
+
+        res.status(200).json({ 
+            success: true, 
+            user: {
+                _id: user._id,
+                name: user.username,
+                email: user.email,
+                level: user.level,
+                genres: user.preferredGenres || [],
+                stats: user.stats
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// Apply the /api prefix to the public routes
+app.use('/api', publicRouter);
+
+// // Handle User Login
+// app.post('/login', async (req, res) => {
+//     try {
+//         const { username, password } = req.body;
+//         const user = await User.findOne({ username });
+        
+//         if (!user || user.password !== password) {
+//             return res.status(401).json({ success: false, message: "Invalid credentials" });
+//         }
+
+//         if (user.isBanned) {
+//             return res.status(403).json({ success: false, message: "Account is banned" });
+//         }
+
+//         // Return the formatted user object that Flutter expects
+//         res.status(200).json({ 
+//             success: true, 
+//             user: {
+//                 _id: user._id,
+//                 name: user.username,
+//                 email: user.email,
+//                 level: user.level,
+//                 genres: user.genres || [],
+//                 stats: user.stats
+//             }
+//         });
+//     } catch (err) {
+//         res.status(500).json({ success: false, message: err.message });
+//     }
+// });
+
+// --- 4. Helper: PDF Parser Logic ---
+const parseQuizPdf = (text) => {
+    const regex = /(\d+)[\.\)]\s*(.+?)\s*[aA][\.\)]\s*(.+?)\s*[bB][\.\)]\s*(.+?)\s*[cC][\.\)]\s*(.+?)\s*[dD][\.\)]\s*(.+?)\s*Answer:\s*([a-dA-D])[\.\)]?/gs;
+    const answerMap = { a: 0, b: 1, c: 2, d: 3, A: 0, B: 1, C: 2, D: 3 };
+    const questions = [];
+    let matches;
+    while ((matches = regex.exec(text)) !== null) {
+        questions.push({
+            questionText: matches[2].trim(),
+            options: [matches[3].trim(), matches[4].trim(), matches[5].trim(), matches[6].trim()],
+            correctAnswer: answerMap[matches[7]]
+        });
+    }
+    return questions;
+};
+
+// --- 5. Admin Routes ---
+
+/** * 1. ANALYTICS & STATS */
+app.get('/admin/stats', requireApiKey, async (req, res) => {
+    try {
+        const totalQuestions = await Question.countDocuments();
+        const userCount = await User.countDocuments();
+        const genreStats = await Question.distinct('genre');
+        res.json({ totalQuestions, userStats: userCount, genreStats });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/admin/analytics', requireApiKey, async (req, res) => {
+    try {
+        const hardQuestions = await Question.find().sort({ "analytics.failRate": -1 }).limit(5);
+        const topPerformers = await User.find().sort({ "stats.totalPoints": -1 }).limit(10);
+        res.json({ hardQuestions, topPerformers });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- MISSING ROUTE: Update User Genres ---
+publicRouter.post('/users/update-genres', async (req, res) => {
+    try {
+        const { userId, preferredGenres } = req.body;
+
+        // Find user and update their genres
+        const updatedUser = await User.findByIdAndUpdate(
+            userId,
+            { preferredGenres: preferredGenres },
+            { new: true } // This returns the user AFTER the update
+        );
+
+        if (!updatedUser) {
+            return res.status(404).json({ success: false, message: "User not found" });
+        }
+
+        // Return the object in the format Flutter expects
+        res.status(200).json({
+            success: true,
+            user: {
+                _id: updatedUser._id.toString(),
+                name: updatedUser.username,
+                email: updatedUser.email,
+                level: updatedUser.level,
+                genres: updatedUser.preferredGenres || [],
+                stats: updatedUser.stats
+            }
+        });
+    } catch (err) {
+        console.error("Genre Update Error:", err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+/** * 2. QUESTION MANAGEMENT */
+app.get('/admin/questions', requireApiKey, async (req, res) => {
+    try {
+        const { genre, id } = req.query;
+        if (id) {
+            const q = await Question.findById(id);
+            return res.json(q ? [q] : []);
+        }
+
+        let query = {};
+        if (genre && genre !== 'All') {
+            query.genre = { $regex: new RegExp(`^${genre.trim()}$`, "i") };
+        }
+
+        const questions = await Question.find(query)
+            .sort({ createdAt: -1 })
+            .lean();
+
+        res.json(questions);
+    } catch (err) { 
+        res.status(500).json({ error: err.message }); 
+    }
+});
+
+app.delete('/admin/questions/bulk', requireApiKey, async (req, res) => {
+    try {
+        const { ids } = req.body;
+        if (!ids || !Array.isArray(ids)) {
+            return res.status(400).json({ error: "Invalid IDs provided" });
+        }
+        const result = await Question.deleteMany({ _id: { $in: ids } });
+        res.json({ 
+            message: `Successfully deleted ${result.deletedCount} questions`,
+            count: result.deletedCount 
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/admin/questions', requireApiKey, async (req, res) => {
+    try {
+        const newQ = new Question({
+            questionText: req.body.questionText,
+            options: req.body.options,
+            correctAnswer: req.body.correctAnswer,
+            genre: req.body.genre,
+            difficulty: req.body.difficulty || 'intermediate'
+        });
+        const savedUser = await newUser.save();
+        res.status(201).json({ 
+            success: true, 
+            user: {
+                _id: savedUser._id,
+                name: savedUser.username,
+                email: savedUser.email,
+                level: savedUser.level,
+                genres: savedUser.preferredGenres || [],
+                stats: savedUser.stats
+            }
+        });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/admin/questions/:id', requireApiKey, async (req, res) => {
+    try {
+        const updated = await Question.findByIdAndUpdate(
+            req.params.id, 
+            {
+                questionText: req.body.questionText,
+                options: req.body.options,
+                correctAnswer: req.body.correctAnswer,
+                genre: req.body.genre,
+                difficulty: req.body.difficulty
+            }, 
+            { new: true }
+        );
+        res.json({ success: true, data: updated });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/admin/questions/:id', requireApiKey, async (req, res) => {
+    try {
+        await Question.findByIdAndDelete(req.params.id);
+        res.json({ success: true, message: "Deleted successfully" });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+/** * 3. USER MANAGEMENT */
+app.get('/admin/users', requireApiKey, async (req, res) => {
+    try {
+        const users = await User.find().sort({ createdAt: -1 });
+
+        const formatted = users.map(u => ({
+            ...u.toObject(),
+            isBanned: u.isBanned ?? false
+        }));
+
+        res.json(formatted);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/** 3. USER MANAGEMENT */
+
+// Ban User
+app.patch('/admin/users/:id/ban', requireApiKey, async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id);
+        if (!user) {
+            return res.status(404).json({ success: false, message: "User not found" });
+        }
+
+        if (user.isBanned) {
+            return res.status(400).json({ success: false, message: "User is already banned" });
+        }
+
+        user.isBanned = true;
+        await user.save();
+
+        res.json({
+            success: true,
+            message: "User banned successfully",
+            isBanned: true
+        });
+
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+
+// Unban User
+app.patch('/admin/users/:id/unban', requireApiKey, async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id);
+        if (!user) {
+            return res.status(404).json({ success: false, message: "User not found" });
+        }
+
+        if (!user.isBanned) {
+            return res.status(400).json({ success: false, message: "User is not banned" });
+        }
+
+        user.isBanned = false;
+        await user.save();
+
+        res.json({
+            success: true,
+            message: "User unbanned successfully",
+            isBanned: false
+        });
+
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// POST: Process PDF with BERT AI
+app.post('/admin/upload-quiz', requireApiKey, async (req, res) => {
+    if (!req.files || !req.files.quizPdf) return res.status(400).json({ error: 'No file uploaded.' });
+
+    try {
+        const file = req.files.quizPdf;
+        const data = await pdf(Buffer.from(file.data));
+        const extracted = parseQuizPdf(data.text);
+        const totalToProcess = extracted.length;
+        
+        console.log(`\n📂 File Received. Total Questions: ${totalToProcess}`);
+        console.log(`🚀 Starting AI classification...`);
+
+        const pythonPath = process.env.PYTHON_PATH || path.join(process.cwd(), '..', 'quiz-royale-ml', 'venv', 'Scripts', 'python.exe');
+        const scriptPath = path.join(process.cwd(), 'process_questions.py');
+
+        const pythonProcess = spawn(pythonPath, ['-u', scriptPath], {
+            cwd: process.cwd(),
+            env: { ...process.env, TRANSFORMERS_OFFLINE: '1', PYTHONIOENCODING: 'utf-8' } // Forced UTF-8
+        });
+
+        const rl = readline.createInterface({ input: pythonProcess.stdout, terminal: false });
+        
+        let totalSaved = 0;
+        let batchBuffer = [];
+        let pendingWrites = [];
+        const DB_BATCH_SIZE = 50; 
+
+        rl.on('line', (line) => {
+            if (!line.trim()) return;
+            try {
+                const qData = JSON.parse(line);
+                batchBuffer.push(qData);
+                
+                if (batchBuffer.length >= DB_BATCH_SIZE) {
+                    const ops = batchBuffer.map(q => ({
+                        updateOne: {
+                            filter: { questionText: q.questionText },
+                            update: { $set: q },
+                            upsert: true
+                        }
+                    }));
+                    
+                    pendingWrites.push(Question.bulkWrite(ops));
+                    totalSaved += batchBuffer.length;
+                    
+                    const percent = ((totalSaved / totalToProcess) * 100).toFixed(1);
+                    console.log(`✅ Progress: ${totalSaved}/${totalToProcess} (${percent}%)`);
+                    
+                    batchBuffer = [];
+                }
+            } catch (e) { console.error("Parse Error:", e.message); }
+        });
+
+        pythonProcess.stderr.on('data', (d) => console.error(`❌ Python Error: ${d.toString()}`));
+        pythonProcess.stdin.write(JSON.stringify(extracted));
+        pythonProcess.stdin.end();
+
+        await new Promise((resolve) => {
+            pythonProcess.on('close', async (code) => {
+                if (batchBuffer.length > 0) {
+                    pendingWrites.push(Question.bulkWrite(batchBuffer.map(q => ({
+                        updateOne: { filter: { questionText: q.questionText }, update: { $set: q }, upsert: true }
+                    }))));
+                    totalSaved += batchBuffer.length;
+                }
+                
+                await Promise.all(pendingWrites);
+                console.log(`\n🏁 FINISHED: All ${totalSaved} questions processed and saved. (Code ${code})`);
+                resolve();
+            });
+        });
+
+        if (!res.headersSent) res.json({ success: true, count: totalSaved });
+
+    } catch (err) {
+        console.error('❌ Fatal Error:', err);
+        if (!res.headersSent) res.status(500).json({ error: err.message });
+    }
+});
+app.get('/admin-panel', (req, res) => {
+    res.sendFile(path.join(process.cwd(), 'public', 'index.html'));
+});
+// --- 6. Server Startup ---
+mongoose.connect(process.env.MONGO_URI)
+    .then(() => {
+        console.log('MongoDB connected');
+        const PORT = process.env.PORT || 4000;
+        server.listen(PORT,'0.0.0.0', () => {
+            console.log(`Quiz Royale Backend running on port ${PORT}`);
+        });
+    })
+    .catch(err => console.error('DB Connection Error:', err));
+
+    // Socket.js
+
+    import { Server } from 'socket.io';
+import mongoose from 'mongoose';
+import Question from '../models/Question.js';
+import User from '../models/User.js';
+import { calculateSimilarity } from '../utils/matchmaking.js';
+
+export const initSocket = (server) => {
+    const io = new Server(server, { cors: { origin: "*" } });
+    let lobby = [];
+    const activeGames = {};
+
+    io.on('connection', (socket) => {
+        console.log("User Connected: " + socket.id);
+
+        socket.on('join_match', async ({ userId }) => {
+            try {
+                const user = await User.findById(userId).lean();
+                if (!user || user.isBanned) {
+                    console.log(`Connection rejected: User ${userId} is banned or not found.`);
+                    socket.emit('error', { message: "Account restricted or not found." });
+                    return;
+                }
+
+                // Normalizing field names based on schema: preferredGenres and level
+                const currentGenres = (user.preferredGenres || []).map(Number);
+                const currentName = user.name || "Anonymous"; 
+                const currentLevel = user.level || "noob";
+
+                console.log(`Lobby Entry: ${currentName} | Level: ${currentLevel} | Genres: [${currentGenres}]`);
+
+                // Matchmaking Logic using Level and Cosine Similarity
+                const opponentIndex = lobby.findIndex(p => {
+                    if (p.userId === userId) return false;
+                    
+                    // Strict requirement: Players must be in the same level tier
+                    if (p.level !== currentLevel) return false;
+
+                    // Matchmaking based on Cosine Similarity (min threshold 0.65)
+                    const vectorA = p.genrePreferences.map(Number);
+                    const vectorB = currentGenres;
+                    const similarity = calculateSimilarity(vectorA, vectorB);
+
+                    console.log(`Matching Attempt: ${currentName} vs ${p.name} | Sim: ${similarity.toFixed(2)}`);
+                    return similarity >= 0.65;
+                });
+
+                if (opponentIndex !== -1) {
+                    const opponent = lobby.splice(opponentIndex, 1)[0];
+                    const roomId = `match_${socket.id}_${opponent.socketId}`;
+                    
+                    socket.join(roomId);
+                    const opponentSocket = io.sockets.sockets.get(opponent.socketId);
+                    if (opponentSocket) opponentSocket.join(roomId);
+
+                    // Combine histories to ensure NO player receives a repeated question
+                    const combinedHistory = [
+                        ...(user.playedQuestions || []),
+                        ...(opponent.playedQuestions || [])
+                    ];
+
+                    // Fetch 20 unique questions (10 for each player to pick from)
+                    const allQuestions = await Question.aggregate([
+                        { 
+                            $match: { 
+                                _id: { $nin: combinedHistory.map(id => new mongoose.Types.ObjectId(id)) } 
+                            } 
+                        }, 
+                        { $sample: { size: 20 } }
+                    ]);
+
+                    const p1Inv = allQuestions.slice(0, 10);
+                    const p2Inv = allQuestions.slice(10, 20);
+
+                    activeGames[roomId] = {
+                        roomId,
+                        p1: { 
+                            socketId: socket.id, 
+                            userId, 
+                            name: currentName, 
+                            level: currentLevel, 
+                            scoreObj: null, 
+                            inventory: p1Inv 
+                        },
+                        p2: { 
+                            socketId: opponent.socketId, 
+                            userId: opponent.userId, 
+                            name: opponent.name, 
+                            level: opponent.level, 
+                            scoreObj: null, 
+                            inventory: p2Inv 
+                        },
+                        duelStarted: false
+                    };
+
+                    // Trigger Selection Screen in Flutter
+                    io.to(roomId).emit('start_selection', {
+                        roomId,
+                        timer: 20,
+                        p1: { id: userId, inventory: p1Inv },
+                        p2: { id: opponent.userId, inventory: p2Inv }
+                    });
+
+                    // Timeout: If players don't select, auto-pick the first 5
+                    setTimeout(async () => {
+                        const game = activeGames[roomId];
+                        if (game && !game.duelStarted) {
+                            if (!game.p1.selections) game.p1.selections = game.p1.inventory.slice(0, 5);
+                            if (!game.p2.selections) game.p2.selections = game.p2.inventory.slice(0, 5);
+                            await startDuel(roomId);
+                        }
+                    }, 22000);
+
+                } else {
+                    // No match found: Add current user to lobby
+                    lobby = lobby.filter(p => p.userId !== userId);
+                    lobby.push({
+                        socketId: socket.id,
+                        userId: user._id.toString(),
+                        name: currentName,
+                        level: currentLevel,
+                        genrePreferences: currentGenres,
+                        playedQuestions: user.playedQuestions || []
+                    });
+                    socket.emit('waiting', { status: "Searching for an opponent..." });
+                }
+            } catch (err) { console.error("Matchmaking error:", err); }
+        });
+
+        // Event: Player submits their 5 chosen questions for the opponent
+        socket.on('submit_selection', async ({ roomId, userId, selectedIds }) => {
+            const game = activeGames[roomId];
+            if (!game || game.duelStarted) return;
+
+            const player = game.p1.userId === userId ? game.p1 : game.p2;
+            player.selections = player.inventory.filter(q => selectedIds.includes(q._id.toString())).slice(0, 5);
+
+            console.log(`User ${userId} submitted ${player.selections.length} selections`);
+
+            if (game.p1.selections && game.p2.selections) {
+                await startDuel(roomId);
+            }
+        });
+
+        const startDuel = async (roomId) => {
+            const game = activeGames[roomId];
+            if (!game || game.duelStarted) return;
+            game.duelStarted = true;
+
+            try {
+                // Questions are swapped: p1 plays what p2 selected, and vice versa
+                const p1History = game.p2.selections.map(q => new mongoose.Types.ObjectId(q._id));
+                const p2History = game.p1.selections.map(q => new mongoose.Types.ObjectId(q._id));
+
+                // Save these to playedQuestions immediately to prevent future repeats
+                await Promise.all([
+                    User.updateOne({ _id: game.p1.userId }, { $addToSet: { playedQuestions: { $each: p1History } } }),
+                    User.updateOne({ _id: game.p2.userId }, { $addToSet: { playedQuestions: { $each: p2History } } })
+                ]);
+            } catch (dbErr) { console.error("History Update Error:", dbErr); }
+
+            io.to(roomId).emit('start_duel', {
+                p1Questions: game.p2.selections, 
+                p2Questions: game.p1.selections, 
+                timer: 60
+            });
+        };
+
+        socket.on('submit_score', ({ roomId, userId, score }) => {
+            const game = activeGames[roomId];
+            if (!game) return;
+
+            const p = game.p1.userId === userId ? game.p1 : game.p2;
+            p.scoreObj = score;
+            p.finalMatchScore = (score.correct * 10) + (score.wrong * -5);
+
+            if (game.p1.scoreObj !== null && game.p2.scoreObj !== null) {
+                finishGame(roomId);
+            }
+        });
+
+        const finishGame = async (roomId) => {
+            const game = activeGames[roomId];
+            if (!game) return;
+
+            const s1 = game.p1.finalMatchScore || 0;
+            const s2 = game.p2.finalMatchScore || 0;
+            let winnerId = s1 > s2 ? game.p1.userId : (s2 > s1 ? game.p2.userId : null);
+            let isDraw = s1 === s2;
+
+            try {
+                for (const p of [game.p1, game.p2]) {
+                    const isWinner = p.userId === winnerId;
+                    
+                    let statChange = 0;
+                    if (!isDraw) {
+                        if (isWinner) {
+                            if (p.level === "noob") statChange = 20;
+                            else if (p.level === "intermediate") statChange = 10;
+                            else if (p.level === "pro") statChange = 5;
+                        } else {
+                            statChange = (p.level === "pro") ? -15 : -10;
+                        }
+                    }
+
+                    let updatedUser = await User.findByIdAndUpdate(p.userId, {
+                        $inc: {
+                            "stats.matchesPlayed": 1,
+                            "stats.wins": isWinner ? 1 : 0,
+                            "stats.losses": (!isWinner && !isDraw) ? 1 : 0,
+                            "stats.draws": isDraw ? 1 : 0,
+                            "stats.totalPoints": statChange,
+                        }
+                    }, { returnDocument: 'after' });
+                    
+                    if (updatedUser) {
+                        let targetLevel = updatedUser.level;
+                        if (updatedUser.stats.totalPoints >= 500 && updatedUser.level === "intermediate") {
+                            targetLevel = "pro";
+                        } else if (updatedUser.stats.totalPoints >= 200 && updatedUser.level === "noob") {
+                            targetLevel = "intermediate";
+                        }
+
+                        if (targetLevel !== updatedUser.level) {
+                            updatedUser = await User.findByIdAndUpdate(p.userId, { level: targetLevel }, { new: true });
+                        }
+
+                        io.to(p.socketId).emit('stats_update', {
+                            points: updatedUser.stats.totalPoints,
+                            tier: updatedUser.level,
+                            matchesPlayed: updatedUser.stats.matchesPlayed
+                        });
+                    }
+                }
+            } catch (err) { console.error("Finalizing error:", err); }
+
+            io.to(roomId).emit('game_over', { 
+                results: [
+                    { userId: game.p1.userId, name: game.p1.name, matchScore: s1 }, 
+                    { userId: game.p2.userId, name: game.p2.name, matchScore: s2 }
+                ], 
+                winner: winnerId 
+            });
+            delete activeGames[roomId];
+        };
+
+        socket.on('disconnect', () => {
+            lobby = lobby.filter(p => p.socketId !== socket.id);
+            for (const roomId in activeGames) {
+                const game = activeGames[roomId];
+                if (game.p1.socketId === socket.id || game.p2.socketId === socket.id) {
+                    const oppId = game.p1.socketId === socket.id ? game.p2.socketId : game.p1.socketId;
+                    io.to(oppId).emit('opponent_left', { message: "Opponent disconnected." });
+                    delete activeGames[roomId];
+                    break;
+                }
+            }
+        });
+    });
+};

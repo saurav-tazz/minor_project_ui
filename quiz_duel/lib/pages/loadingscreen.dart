@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:quiz_duel/pages/questionSelection.dart';
 import 'package:quiz_duel/services/socket_service.dart';
 
 class LoadingScreen extends StatefulWidget {
@@ -9,12 +10,14 @@ class LoadingScreen extends StatefulWidget {
   const LoadingScreen({super.key, required this.userId, required this.genres});
 
   @override
+  // ignore: library_private_types_in_public_api
   _LoadingScreenState createState() => _LoadingScreenState();
 }
 
 class _LoadingScreenState extends State<LoadingScreen> {
   double progress = 0;
   Timer? _timer;
+  Timer? _fallbackTimer;
   String opponentName = "?";
 
   @override
@@ -24,6 +27,7 @@ class _LoadingScreenState extends State<LoadingScreen> {
     // Start matchmaking
     SocketService.instance.socket?.emit('join_match', {
       'userId': widget.userId,
+      'genres': widget.genres,
     });
 
     // Listen to matchmaking events
@@ -33,29 +37,35 @@ class _LoadingScreenState extends State<LoadingScreen> {
 
     SocketService.instance.socket?.on('start_selection', (data) {
       _timer?.cancel();
+      _fallbackTimer?.cancel();
 
-      // Identify opponent
-      Map opponent;
-      if (data['p1']['id'] == widget.userId) {
-        opponent = data['p2'];
-      } else {
-        opponent = data['p1'];
-      }
+      final roomId = data['roomId'];
+      final timer = data['timer'];
+
+      final bool amIP1 = data['p1']['id'] == widget.userId;
+
+      final myInventory = amIP1
+          ? data['p1']['inventory']
+          : data['p2']['inventory'];
+      final opponent = amIP1 ? data['p2']['name'] : data['p1']['name'];
 
       setState(() {
-        opponentName = opponent['name'] ?? "Opponent";
+        opponentName = opponent;
       });
 
       Navigator.pushReplacementNamed(
         context,
         '/questionSelection',
         arguments: {
-          'roomId': data['roomId'],
+          'roomId': roomId,
           'userId': widget.userId,
-          'inventory': opponent['id'] == data['p1']['id']
-              ? data['p2']['inventory']
-              : data['p1']['inventory'],
-          'genres': widget.genres,
+          'inventory': myInventory,
+          'timer': timer,
+          'opponentName': opponent,
+          'amIP1': amIP1,
+          'selectionTimer': 30, // 30 seconds for draft phase
+          'matchTimer': 60, // 60 seconds for the actual match
+          'socket': SocketService.instance.socket,
         },
       );
     });
@@ -66,6 +76,24 @@ class _LoadingScreenState extends State<LoadingScreen> {
         context,
       ).showSnackBar(SnackBar(content: Text("Error: $message")));
       Navigator.pop(context);
+    });
+
+    _fallbackTimer = Timer(const Duration(seconds: 5), () {
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => QuestionSelectionScreen(
+              roomId: "fallback-room", // placeholder
+              userId: widget.userId,
+              inventory: [], // no inventory yet
+              timer: 20,
+              socket: SocketService.instance.socket!,
+              amIP1: true, // assume player 1 for fallback
+            ),
+          ),
+        );
+      }
     });
   }
 
@@ -81,6 +109,7 @@ class _LoadingScreenState extends State<LoadingScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _fallbackTimer?.cancel();
     SocketService.instance.socket?.off('waiting');
     SocketService.instance.socket?.off('start_selection');
     SocketService.instance.socket?.off('error');

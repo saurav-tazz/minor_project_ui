@@ -1,354 +1,361 @@
-import 'package:flutter/material.dart';
 import 'dart:async';
-import 'package:quiz_duel/pages/resultscreen.dart';
+import 'package:flutter/material.dart';
+import 'package:socket_io_client/socket_io_client.dart' as IO;
 
-class PlayScreen extends StatefulWidget {
-  final List<dynamic> questions;
+class MatchRoomScreen extends StatefulWidget {
   final String roomId;
   final String userId;
-  final dynamic socket;
-  final List<int>? genres;
+  final List<dynamic> questions;
+  final IO.Socket socket;
 
-  const PlayScreen({
-    super.key,
-    required this.questions,
+  const MatchRoomScreen({
+    Key? key,
     required this.roomId,
     required this.userId,
+    required this.questions,
     required this.socket,
-    this.genres,
-  });
+  }) : super(key: key);
 
   @override
-  State<PlayScreen> createState() => _PlayScreenState();
+  State<MatchRoomScreen> createState() => _MatchRoomScreenState();
 }
 
-class _PlayScreenState extends State<PlayScreen> {
-  int currentQuestionIndex = 0;
-  int playerScore = 0;
-  int wrongAnswers = 0;
-  bool answered = false;
-  String? selectedAnswer;
-
-  int _timeLeft = 60;
+class _MatchRoomScreenState extends State<MatchRoomScreen> {
+  int currentIndex = 0;
+  int score = 0;
+  int correctCount = 0;
+  int wrongCount = 0;
+  int timeLeft = 10;
   Timer? _timer;
+  bool answered = false;
 
   @override
   void initState() {
     super.initState();
-    startTimer();
+    _startQuestionTimer();
 
-    // 🔹 LISTENER: Handle Game Over (triggered when both players submit scores)
     widget.socket.on('game_over', (data) {
       if (mounted) {
-        _timer?.cancel();
-
-        // Ensure any open dialogs are closed before navigating to results
-        Navigator.of(
+        final args = Map<String, dynamic>.from(data);
+        args['myId'] = widget.userId; // so ResultScreen knows who "me" is
+        Navigator.pushReplacementNamed(
           context,
-          rootNavigator: true,
-        ).popUntil((route) => route.isFirst == false);
-
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) =>
-                ResultScreen(gameResults: data, socket: widget.socket),
-          ),
+          '/resultscreen',
+          arguments: args,
         );
       }
     });
   }
 
-  void startTimer() {
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_timeLeft > 0) {
-        setState(() => _timeLeft--);
-      } else {
-        _timer?.cancel();
-        submitFinalScore();
-      }
-    });
-  }
-
-  void checkAnswer(String selected) {
-    if (answered) return;
-
+  void _startQuestionTimer() {
+    _timer?.cancel();
     setState(() {
-      answered = true;
-      selectedAnswer = selected;
-
-      if (selected == widget.questions[currentQuestionIndex]["correctAnswer"]) {
-        playerScore++;
-      } else {
-        wrongAnswers++;
-      }
+      timeLeft = 10;
+      answered = false;
     });
 
-    // Short delay so the player can see the correct/incorrect feedback colors
-    Future.delayed(const Duration(milliseconds: 1200), () {
-      if (currentQuestionIndex < widget.questions.length - 1) {
-        if (mounted) {
-          setState(() {
-            currentQuestionIndex++;
-            answered = false;
-            selectedAnswer = null;
-          });
-        }
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (timeLeft > 0) {
+        setState(() => timeLeft--);
       } else {
-        submitFinalScore();
+        _nextQuestion();
       }
     });
   }
 
-  void submitFinalScore() {
-    if (_timer != null && _timer!.isActive) _timer!.cancel();
+  void _handleAnswer(int selectedIndex) {
+    if (answered) return;
+    _timer?.cancel();
 
-    widget.socket.emit('submit_score', {
-      'roomId': widget.roomId,
-      'userId': widget.userId,
-      'score': {
-        'correct': playerScore,
-        'wrong': wrongAnswers,
-        'timeLeft': _timeLeft,
-      },
-    });
+    final currentQuestion = widget.questions[currentIndex];
+    final isCorrect = selectedIndex == currentQuestion['correctAnswerIndex'];
 
-    _showWaitingOverlay();
+    if (isCorrect) {
+      score += 10;
+      correctCount++;
+    } else {
+      wrongCount++;
+    }
+
+    setState(() => answered = true);
+
+    // widget.socket.emit('submit_answer', {
+    //   'roomId': widget.roomId,
+    //   'userId': widget.userId,
+    //   'questionIndex': currentIndex,
+    //   'isCorrect': isCorrect,
+    //   'points': isCorrect ? 10 : 0,
+    // }); claude commented out for testing without socket connection
+
+    Future.delayed(const Duration(milliseconds: 800), _nextQuestion);
   }
 
-  void _showWaitingOverlay() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => WillPopScope(
-        onWillPop: () async => false,
-        child: Center(
-          child: Card(
-            elevation: 10,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 30),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const CircularProgressIndicator(
-                    strokeWidth: 5,
-                    color: Colors.blueAccent,
-                  ),
-                  const SizedBox(height: 25),
-                  const Text(
-                    "BATTLE ENDED",
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    "Waiting for opponent...",
-                    style: TextStyle(color: Colors.grey.shade600),
-                  ),
-                  const Divider(height: 30),
-                  Text(
-                    "Your Correct Answers: $playerScore",
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.green,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+  void _nextQuestion() {
+    if (currentIndex < widget.questions.length - 1) {
+      setState(() {
+        currentIndex++;
+      });
+      _startQuestionTimer();
+    } else {
+      _timer?.cancel();
+
+      print(
+        "DEBUG: Sending Score - Correct: $correctCount, Wrong: $wrongCount",
+      );
+
+      widget.socket.emit('submit_score', {
+        'roomId': widget.roomId,
+        'userId': widget.userId,
+        'score': {'correct': correctCount, 'wrong': wrongCount},
+      });
+    }
+
+    // All questions done — send final score to backend- claude commented out for testing without socket connection
+    // widget.socket.emit('submit_score', {
+    //   'roomId': widget.roomId,
+    //   'userId': widget.userId,
+    //   'score': {'correct': correctCount, 'wrong': wrongCount},
+    // });
+    // Navigation now happens via the 'game_over' socket event in initState
+
+    // Future.delayed(const Duration(milliseconds: 500), () {
+    //   if (mounted) {
+    //     Navigator.pushReplacementNamed(
+    //       context,
+    //       '/resultscreen', // Matches your main.dart onGenerateRoute name
+    //       arguments: {
+    //         'results': [
+    //           {
+    //             'userId': widget.userId,
+    //             'name': 'You (Testing)',
+    //             'matchScore': score,
+    //           },
+    //           {
+    //             'userId': 'dummy_id',
+    //             'name': 'Opponent',
+    //             'matchScore': 30, // Dummy score for testing
+    //           },
+    //         ],
+    //         'winner': score > 30 ? widget.userId : 'dummy_id',
+    //       },
+    //     );
+    //   }
+    // });claude commented out for testing without socket connection
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    // Stop listening to game_over before the widget is destroyed
     widget.socket.off('game_over');
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    // if (widget.questions.isEmpty) {
+    //   return const Scaffold(body: Center(child: Text("No questions found.")));
+    // }
     if (widget.questions.isEmpty) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text("No questions found (Testing Mode)"),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  // 🚀 MANUALLY JUMP TO RESULTS
+                  Navigator.pushReplacementNamed(
+                    context,
+                    '/resultscreen',
+                    arguments: {
+                      'results': [
+                        {
+                          'userId': 'test_user',
+                          'name': 'You (Tester)',
+                          'matchScore': 80, // Dummy score
+                        },
+                        {
+                          'userId': 'bot_123',
+                          'name': 'Opponent',
+                          'matchScore': 50, // Dummy score
+                        },
+                      ],
+                      'winner': 'test_user', // Sets you as winner for testing
+                    },
+                  );
+                },
+                child: const Text("View Result Screen"),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
-    final question = widget.questions[currentQuestionIndex];
+    final question = widget.questions[currentIndex];
 
-    return WillPopScope(
-      onWillPop: () async => false, // Prevent users from leaving mid-game
-      child: Scaffold(
-        body: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF1A237E), Color(0xFF0D47A1)],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
+    return Scaffold(
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF21A1F1), Color(0xFF2563EB)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-          child: SafeArea(
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                // 🔹 Match Status Header
-                Padding(
-                  padding: const EdgeInsets.all(20),
+                /// 🔹 Top Scoreboard
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _statusChip(
-                        Icons.timer,
-                        "$_timeLeft s",
-                        _timeLeft < 10 ? Colors.red : Colors.orange,
+                      /// You
+                      // Column(
+                      //   children: [
+                      //     const Text(
+                      //       "You",
+                      //       style: TextStyle(color: Colors.white70),
+                      //     ),
+                      //     Text(
+                      //       "$score pts",
+                      //       style: const TextStyle(
+                      //         color: Colors.white,
+                      //         fontWeight: FontWeight.bold,
+                      //       ),
+                      //     ),
+                      //   ],
+                      // ),
+
+                      /// Timer Circle
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          "${timeLeft}s",
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
-                      _statusChip(
-                        Icons.emoji_events,
-                        "$playerScore",
-                        Colors.amber,
+
+                      /// Opponent Placeholder
+                      // Column(
+                      //   children: const [
+                      //     Text(
+                      //       "Opponent",
+                      //       style: TextStyle(color: Colors.white70),
+                      //     ),
+                      //     Text(
+                      //       "0 pts",
+                      //       style: TextStyle(
+                      //         color: Colors.white,
+                      //         fontWeight: FontWeight.bold,
+                      //       ),
+                      //     ),
+                      //   ],
+                      // ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 25),
+
+                /// 🔹 Question Card
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Question ${currentIndex + 1} of ${widget.questions.length}",
+                        style: const TextStyle(
+                          color: Colors.black54,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
-                      _statusChip(
-                        Icons.quiz,
-                        "${currentQuestionIndex + 1}/${widget.questions.length}",
-                        Colors.blue,
+                      const SizedBox(height: 10),
+                      Text(
+                        question['questionText'],
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black,
+                        ),
                       ),
                     ],
                   ),
                 ),
 
-                // 🔹 Question Progress Indicator
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: LinearProgressIndicator(
-                      value:
-                          (currentQuestionIndex + 1) / widget.questions.length,
-                      backgroundColor: Colors.white10,
-                      valueColor: const AlwaysStoppedAnimation(Colors.white),
-                      minHeight: 8,
-                    ),
-                  ),
-                ),
+                const SizedBox(height: 20),
 
-                const Spacer(),
-
-                // 🔹 Question Container
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 25),
-                  child: Text(
-                    question["questionText"] ?? "Question loading...",
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                      shadows: [
-                        Shadow(
-                          color: Colors.black45,
-                          blurRadius: 5,
-                          offset: Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const Spacer(),
-
-                // 🔹 Options List
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 30,
-                  ),
-                  child: Column(
-                    children: (question["options"] as List).map((opt) {
-                      final optionText = opt.toString();
-                      final isCorrect = optionText == question["correctAnswer"];
-                      final isSelected = selectedAnswer == optionText;
-
+                /// 🔹 Options
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: question['options'].length,
+                    itemBuilder: (context, i) {
                       return Padding(
-                        padding: const EdgeInsets.only(bottom: 14),
+                        padding: const EdgeInsets.only(bottom: 12),
                         child: ElevatedButton(
-                          onPressed: answered
-                              ? null
-                              : () => checkAnswer(optionText),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: answered
-                                ? (isCorrect
-                                      ? Colors.greenAccent.shade700
-                                      : (isSelected
-                                            ? Colors.redAccent
-                                            : Colors.white.withOpacity(0.9)))
-                                : Colors.white,
-                            disabledBackgroundColor: isCorrect
-                                ? Colors.greenAccent.shade700
-                                : (isSelected
-                                      ? Colors.redAccent
-                                      : Colors.white24),
-                            foregroundColor:
-                                (answered && (isSelected || isCorrect))
-                                ? Colors.white
-                                : Colors.blue.shade900,
-                            minimumSize: const Size(double.infinity, 65),
+                            backgroundColor: Colors.grey.shade200,
+                            foregroundColor: Colors.black87,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(18),
+                              borderRadius: BorderRadius.circular(15),
                             ),
-                            elevation: isSelected ? 0 : 5,
+                            elevation: 0,
                           ),
-                          child: Text(
-                            optionText,
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: (isSelected || isCorrect)
-                                  ? FontWeight.bold
-                                  : FontWeight.w500,
-                              color: (answered && (isSelected || isCorrect))
-                                  ? Colors.white
-                                  : Colors.black87,
+                          onPressed: () => _handleAnswer(i),
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              "${String.fromCharCode(65 + i)}. ${question['options'][i]}",
+                              style: const TextStyle(fontSize: 16),
                             ),
                           ),
                         ),
                       );
-                    }).toList(),
+                    },
+                  ),
+                ),
+
+                /// 🔹 Bottom Progress Bar
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: LinearProgressIndicator(
+                    value: (currentIndex + 1) / widget.questions.length,
+                    minHeight: 8,
+                    backgroundColor: Colors.white24,
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                      Colors.black87,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _statusChip(IconData icon, String label, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.white24),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: color, size: 20),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-              color: Colors.white,
-            ),
-          ),
-        ],
       ),
     );
   }

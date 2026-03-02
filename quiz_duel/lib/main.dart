@@ -2,123 +2,143 @@ import 'package:flutter/material.dart';
 import 'package:quiz_duel/pages/authentication.dart';
 import 'package:quiz_duel/pages/genre.dart';
 import 'package:quiz_duel/pages/splash.dart';
-import 'package:quiz_duel/pages/matchroom.dart';
 import 'package:quiz_duel/pages/homescreen.dart';
 import 'package:quiz_duel/pages/profile.dart';
 import 'package:quiz_duel/pages/resultscreen.dart';
 import 'package:quiz_duel/pages/questionSelection.dart';
 import 'package:quiz_duel/pages/loadingscreen.dart';
+import 'package:quiz_duel/pages/matchroom.dart';
 
-// Import backend services
 import 'package:quiz_duel/services/socket_service.dart';
 import 'package:quiz_duel/services/api_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 1. UPDATE THIS IP: This is the address of your Backend Laptop
-  const String activeBackendIp = "https://quiz-royale-ash0.onrender.com/api";
+  // ✅ REST API BASE
+  const String apiBase = "https://quiz-royale-ash0.onrender.com/api";
 
-  // 2. Initialize ApiService with the new IP
-  ApiService.init(baseUrl: activeBackendIp);
+  // ✅ SOCKET BASE (NO /api)
+  const String socketBase = "https://quiz-royale-ash0.onrender.com";
 
-  // 3. Initialize Socket connection
-  await SocketService.instance.connect(activeBackendIp);
+  ApiService.init(baseUrl: apiBase);
 
-  runApp(const QuizDuel());
+  await SocketService.instance.connect(socketBase);
+
+  runApp(const QuizRoyale());
 }
 
-class QuizDuel extends StatelessWidget {
-  const QuizDuel({super.key});
+class QuizRoyale extends StatelessWidget {
+  const QuizRoyale({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'QuizDuel',
+      title: 'QuiRoyale',
       initialRoute: '/',
       routes: {
         '/': (context) => const SplashScreen(),
         '/auth': (context) => const AuthScreen(),
         '/genre': (context) => const GenreScreen(),
-        '/loadingscreen': (context) => LoadingScreen(
-          userId: ModalRoute.of(context)!.settings.arguments != null
-              ? (ModalRoute.of(context)!.settings.arguments as Map)['userId']
-              : '',
-          genres: ModalRoute.of(context)!.settings.arguments != null
-              ? List<int>.from(
-                  (ModalRoute.of(context)!.settings.arguments as Map)['genres'],
-                )
-              : [],
-        ),
+
+        '/loadingscreen': (context) {
+          final args = ModalRoute.of(context)!.settings.arguments as Map;
+
+          return LoadingScreen(
+            userId: args['userId'],
+            genres: List<int>.from(args['genres']),
+            // socket: SocketService.instance.socket!,
+          );
+        },
       },
+
       onGenerateRoute: (settings) {
-        // --- MATCHROOM ROUTE ---
-        if (settings.name == '/matchroom') {
-          final args = settings.arguments as Map<String, dynamic>;
-          return MaterialPageRoute(
-            builder: (context) => PlayScreen(
-              // This is the class name inside matchroom.dart
-              questions: args['questions'] ?? [],
-              roomId: args['roomId'] ?? '',
-              userId: args['userId'] ?? '',
-              socket: SocketService.instance.socket,
-              genres: args['genres'],
-            ),
-          );
-        }
+        final args = settings.arguments as Map<String, dynamic>?;
 
-        // --- PROFILE ROUTE ---
-        if (settings.name == '/profile') {
-          final args = settings.arguments as Map<String, dynamic>;
-          return MaterialPageRoute(
-            builder: (context) => ProfileScreen(
-              userId: args['userId'],
-              username: args['username'],
-              tier: args['tier'],
-              points: args['points'],
-              matchesPlayed: args['matchesPlayed'],
-              wins: args['wins'],
-              draws: args['draws'],
-              losses: args['losses'],
-              genres: args['genres'],
-              socket:
-                  SocketService.instance.socket, // Real-time listener instance
-            ),
-          );
-        }
-
-        // --- HOME ROUTE ---
-        if (settings.name == '/home') {
-          final args = settings.arguments as Map<String, dynamic>;
-          return MaterialPageRoute(
-            builder: (context) => HomeScreen(
-              genres: List<int>.from(args['genres'] ?? []),
-              userData: args,
-            ),
-          );
-        }
-
-        // --- QUESTION SELECTION ROUTE ---
+        // ✅ QUESTION SELECTION
         if (settings.name == '/questionSelection') {
-          final args = settings.arguments as Map<String, dynamic>;
           return MaterialPageRoute(
-            builder: (context) => QuestionSelectionScreen(
-              // inventory: args['inventory'],
-              roomId: args['roomId'],
-              userId: args['userId'],
-              socket: SocketService.instance.socket,
-              genres: args['genres'],
+            builder: (_) => QuestionSelectionScreen(
+              roomId: args?['roomId'],
+              userId: args?['userId'],
+              inventory: args?['inventory'],
+              timer: args?['timer'],
+              socket: SocketService.instance.socket!,
+              amIP1: args?['amIP1'] ?? true, // default to true if not provided
             ),
           );
         }
 
-        // --- RESULTS ROUTE ---
-        if (settings.name == '/resultscreen') {
-          final args = settings.arguments as Map<String, dynamic>;
+        //MATCHROOM (DUEL SCREEN)
+        // if (settings.name == '/matchroom') {
+        //   return MaterialPageRoute(
+        //     builder: (_) => MatchRoomScreen(
+        //       roomId: args?['roomId'],
+        //       userId: args?['userId'],
+        //       questions: args?['questions'] ?? [],
+        //       socket: SocketService.instance.socket!,
+        //     ),
+        //   );
+        // }
+        //MATCHROOM (DUEL SCREEN) with argument validation
+        if (settings.name == '/matchroom') {
+          final args = settings.arguments as Map<String, dynamic>?;
+
+          // Validate that we actually have the required data
+          if (args == null ||
+              args['roomId'] == null ||
+              args['userId'] == null) {
+            return MaterialPageRoute(
+              builder: (_) => const Scaffold(
+                body: Center(child: Text("Error: Missing Match Data")),
+              ),
+            );
+          }
+
           return MaterialPageRoute(
-            builder: (context) => ResultScreen(
-              gameResults: args,
+            builder: (_) => MatchRoomScreen(
+              roomId: args['roomId'], // No more '?' needed here after the check
+              userId: args['userId'],
+              questions: args['questions'] ?? [],
+              socket: SocketService.instance.socket!,
+            ),
+          );
+        }
+
+        // ✅ PROFILE
+        if (settings.name == '/profile') {
+          return MaterialPageRoute(
+            builder: (_) => ProfileScreen(
+              userId: args?['userId'],
+              username: args?['username'],
+              tier: args?['tier'],
+              points: args?['points'],
+              matchesPlayed: args?['matchesPlayed'],
+              wins: args?['wins'],
+              draws: args?['draws'],
+              losses: args?['losses'],
+              genres: args?['genres'],
+              socket: SocketService.instance.socket,
+            ),
+          );
+        }
+
+        // ✅ HOME
+        if (settings.name == '/home') {
+          return MaterialPageRoute(
+            builder: (_) => HomeScreen(
+              genres: List<int>.from(args?['genres'] ?? []),
+              userData: args ?? {},
+            ),
+          );
+        }
+
+        // ✅ RESULT SCREEN
+        if (settings.name == '/resultscreen') {
+          return MaterialPageRoute(
+            builder: (_) => ResultScreen(
+              gameResults: args ?? {},
               socket: SocketService.instance.socket,
             ),
           );

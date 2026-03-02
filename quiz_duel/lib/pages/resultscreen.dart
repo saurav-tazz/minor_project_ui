@@ -32,29 +32,45 @@ class _ResultScreenState extends State<ResultScreen> {
     final String? winnerId = widget.gameResults['winner'];
 
     // Use the socket ID to identify which result entry belongs to the local player
-    final String myId = widget.socket.id ?? "";
+    //final String myId = widget.socket.id ?? "";
+
+    final String myId = widget.gameResults['myId'] ?? "";
 
     // Find "Me" and "Opponent" in the results array
     final me = results.firstWhere(
-      (user) => user['userId'] == myId,
+      (user) => user['userId'].toString() == myId.toString(),
       orElse: () => results[0], // Fallback to first entry if ID mismatch
     );
     final op = results.firstWhere(
-      (user) => user['userId'] != me['userId'],
+      (user) => user['userId'].toString() != myId.toString(),
       orElse: () => results.length > 1
           ? results[1]
-          : {'name': 'Opponent', 'matchScore': 0},
+          : {
+              'name': 'Opponent',
+              'matchScore': 0,
+            }, // Fallback to second entry or first if only one
     );
 
-    playerName = me['name'] ?? "You";
-    opponentName = op['name'] ?? "Opponent";
+    setState(() {
+      playerName = me['name'] ?? "You";
+      opponentName = op['name'] ?? "Opponent";
 
-    // matchScore calculated by backend: (correct * 10) + (wrong * -5)
-    playerPoints = me['matchScore'] ?? 0;
-    opponentPoints = op['matchScore'] ?? 0;
+      // matchScore calculated by backend: (correct * 10) + (wrong * -5)
+      playerPoints = me['matchScore'] ?? 0;
+      opponentPoints = op['matchScore'] ?? 0;
 
-    draw = winnerId == null || winnerId == "draw";
-    playerWon = !draw && winnerId == me['userId'];
+      // draw = winnerId == null || winnerId == "draw";
+      // playerWon = !draw && winnerId == me['userId'];
+      if (winnerId == "draw" ||
+          winnerId == null ||
+          playerPoints == opponentPoints) {
+        draw = true;
+        playerWon = false;
+      } else {
+        draw = false;
+        playerWon = (winnerId.toString() == myId.toString());
+      }
+    });
   }
 
   @override

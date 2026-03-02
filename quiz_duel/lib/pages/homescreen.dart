@@ -89,7 +89,7 @@ class HomeScreen extends StatelessWidget {
                     const Color(0xFF1E88E5),
                     () => _navigateTo(context, '/loadingscreen', {
                       'userId': userData['_id'],
-                      'genres': genres,
+                      'genres': genres, // List<int> e.g., [1, 4, 7]
                     }),
                   ),
                   _buildModeCard(
