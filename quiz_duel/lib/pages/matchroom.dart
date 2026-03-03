@@ -71,7 +71,12 @@ class _MatchRoomScreenState extends State<MatchRoomScreen> {
     _timer?.cancel();
 
     final currentQuestion = widget.questions[currentIndex];
-    final isCorrect = selectedIndex == currentQuestion['correctAnswerIndex'];
+
+    print("DEBUG question keys: ${currentQuestion.keys.toList()}");
+    print("DEBUG correctAnswerIndex: ${currentQuestion['correctAnswer']}");
+    print("DEBUG selectedIndex: $selectedIndex");
+
+    final isCorrect = selectedIndex == currentQuestion['correctAnswer'];
 
     if (isCorrect) {
       score += 10;

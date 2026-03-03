@@ -2,12 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:quiz_duel/widgets/logo.dart';
 import 'package:quiz_duel/services/socket_service.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   final List<int> genres;
   // userData contains: _id, name, email, level, genres, stats: {wins, losses, etc}
   final Map<String, dynamic> userData;
 
   const HomeScreen({super.key, required this.genres, required this.userData});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  late List<int> currentGenres; // ADD
+  late Map<String, dynamic> currentUserData; // ADD
+  @override
+  void initState() {
+    super.initState();
+    currentGenres = widget.genres;
+    currentUserData = widget.userData;
+  }
 
   void _navigateTo(BuildContext context, String route, Object? args) {
     Navigator.pushNamed(context, route, arguments: args);
@@ -17,10 +31,9 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     // Extracting stats from userData or providing defaults
     final String username =
-        userData['username'] ?? userData['name'] ?? 'Player';
-    final String level = userData['level'] ?? 'noob';
-    final Map stats = userData['stats'] ?? {};
-
+        currentUserData['username'] ?? currentUserData['name'] ?? 'Player';
+    final String level = currentUserData['level'] ?? 'noob';
+    final Map stats = currentUserData['stats'] ?? {};
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
@@ -38,22 +51,36 @@ class HomeScreen extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.person, color: Colors.white),
-            onPressed: () {
-              // Passing actual user data AND the socket instance for real-time updates
-              _navigateTo(context, '/profile', {
-                'userId': userData['_id'],
-                'username': username,
-                'tier': level,
-                'points': stats['totalPoints'] ?? 0,
-                'matchesPlayed': stats['matchesPlayed'] ?? 0,
-                'wins': stats['wins'] ?? 0,
-                'draws': stats['draws'] ?? 0,
-                'losses': stats['losses'] ?? 0,
-                'genres': genres,
-                'socket': SocketService
-                    .instance
-                    .socket, // Essential for Profile listeners
-              });
+            onPressed: () async {
+              final updatedGenres = await Navigator.pushNamed(
+                context,
+                '/profile',
+                arguments: {
+                  'userId': currentUserData['_id'],
+                  'username':
+                      currentUserData['username'] ??
+                      currentUserData['name'] ??
+                      'Player',
+                  'tier': currentUserData['level'] ?? 'noob',
+                  'points':
+                      (currentUserData['stats'] ?? {})['totalPoints'] ?? 0,
+                  'matchesPlayed':
+                      (currentUserData['stats'] ?? {})['matchesPlayed'] ?? 0,
+                  'wins': (currentUserData['stats'] ?? {})['wins'] ?? 0,
+                  'draws': (currentUserData['stats'] ?? {})['draws'] ?? 0,
+                  'losses': (currentUserData['stats'] ?? {})['losses'] ?? 0,
+                  'genres': currentGenres,
+                },
+              );
+              if (updatedGenres != null && updatedGenres is List) {
+                setState(() {
+                  currentGenres = List<int>.from(updatedGenres);
+                  currentUserData = {
+                    ...currentUserData,
+                    'genres': currentGenres,
+                  };
+                });
+              }
             },
           ),
         ],
@@ -89,9 +116,9 @@ class HomeScreen extends StatelessWidget {
                     Icons.flash_on,
                     const Color(0xFF1E88E5),
                     () => _navigateTo(context, '/loadingscreen', {
-                      'userId': userData['_id'],
-                      'genres': genres, // List<int> e.g., [1, 4, 7]
-                      'userData': userData,
+                      'userId': currentUserData['_id'],
+                      'genres': currentGenres,
+                      'userData': currentUserData,
                     }),
                   ),
                   _buildModeCard(
@@ -101,9 +128,9 @@ class HomeScreen extends StatelessWidget {
                     Icons.group,
                     Colors.orange,
                     () => _navigateTo(context, '/matchroom', {
-                      'userId': userData['_id'],
-                      'genres': genres,
-                      'userData': userData,
+                      'userId': widget.userData['_id'],
+                      'genres': widget.genres,
+                      'userData': widget.userData,
                     }),
                   ),
                   _buildModeCard(
@@ -113,8 +140,8 @@ class HomeScreen extends StatelessWidget {
                     Icons.school,
                     Colors.purple,
                     () => _navigateTo(context, '/matchroom', {
-                      'userId': userData['_id'],
-                      'genres': genres,
+                      'userId': widget.userData['_id'],
+                      'genres': widget.genres,
                     }),
                   ),
                   _buildModeCard(
