@@ -16,7 +16,8 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Extracting stats from userData or providing defaults
-    final String username = userData['name'] ?? 'Player';
+    final String username =
+        userData['username'] ?? userData['name'] ?? 'Player';
     final String level = userData['level'] ?? 'noob';
     final Map stats = userData['stats'] ?? {};
 
@@ -90,6 +91,7 @@ class HomeScreen extends StatelessWidget {
                     () => _navigateTo(context, '/loadingscreen', {
                       'userId': userData['_id'],
                       'genres': genres, // List<int> e.g., [1, 4, 7]
+                      'userData': userData,
                     }),
                   ),
                   _buildModeCard(
@@ -101,6 +103,7 @@ class HomeScreen extends StatelessWidget {
                     () => _navigateTo(context, '/matchroom', {
                       'userId': userData['_id'],
                       'genres': genres,
+                      'userData': userData,
                     }),
                   ),
                   _buildModeCard(

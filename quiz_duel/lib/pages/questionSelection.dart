@@ -9,6 +9,7 @@ class QuestionSelectionScreen extends StatefulWidget {
   final int timer;
   final IO.Socket socket;
   final bool amIP1;
+  final Map<String, dynamic> userData;
 
   const QuestionSelectionScreen({
     super.key,
@@ -18,6 +19,7 @@ class QuestionSelectionScreen extends StatefulWidget {
     required this.timer,
     required this.socket,
     required this.amIP1,
+    this.userData = const {},
   });
 
   @override
@@ -55,18 +57,40 @@ class _QuestionSelectionScreenState extends State<QuestionSelectionScreen> {
             'roomId': widget.roomId,
             'userId': widget.userId,
             'questions': myQuestions, // Use the player-specific questions
+            'userData': widget.userData,
           },
         );
       }
     });
   }
 
+  // 3/3/2026--autosubmit if time runs out before user selects 5 questions. Fills remaining slots with random inventory items.
+  // void _startTimer() {
+  //   _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+  //     if (timeLeft > 0) {
+  //       setState(() => timeLeft--);
+  //     } else {
+  //       _submitSelection();
+  //     }
+  //   });
+  // }
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (timeLeft > 0) {
         setState(() => timeLeft--);
       } else {
-        _submitSelection();
+        _timer?.cancel();
+        // IF THE USER SELECTED SOME BUT NOT ALL, AUTO-FILL AND SUBMIT
+        if (selectedIds.length < 5) {
+          // Fill remaining slots from inventory
+          for (var item in widget.inventory) {
+            if (selectedIds.length >= 5) break;
+            if (!selectedIds.contains(item['_id'].toString())) {
+              selectedIds.add(item['_id'].toString());
+            }
+          }
+        }
+        _submitSelection(); // Send whatever we have (now 5) to the server
       }
     });
   }

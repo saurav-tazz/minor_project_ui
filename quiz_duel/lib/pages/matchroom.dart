@@ -7,14 +7,16 @@ class MatchRoomScreen extends StatefulWidget {
   final String userId;
   final List<dynamic> questions;
   final IO.Socket socket;
+  final Map<String, dynamic> userData;
 
   const MatchRoomScreen({
-    Key? key,
+    super.key,
     required this.roomId,
     required this.userId,
     required this.questions,
     required this.socket,
-  }) : super(key: key);
+    this.userData = const {}, // Optional user data for later use
+  });
 
   @override
   State<MatchRoomScreen> createState() => _MatchRoomScreenState();
@@ -38,6 +40,7 @@ class _MatchRoomScreenState extends State<MatchRoomScreen> {
       if (mounted) {
         final args = Map<String, dynamic>.from(data);
         args['myId'] = widget.userId; // so ResultScreen knows who "me" is
+        args['userData'] = widget.userData;
         Navigator.pushReplacementNamed(
           context,
           '/resultscreen',

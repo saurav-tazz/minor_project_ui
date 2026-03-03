@@ -6,8 +6,14 @@ import 'package:quiz_duel/services/socket_service.dart';
 class LoadingScreen extends StatefulWidget {
   final String userId;
   final List<int> genres;
+  final Map<String, dynamic> userData;
 
-  const LoadingScreen({super.key, required this.userId, required this.genres});
+  const LoadingScreen({
+    super.key,
+    required this.userId,
+    required this.genres,
+    required this.userData,
+  });
 
   @override
   // ignore: library_private_types_in_public_api
@@ -66,6 +72,7 @@ class _LoadingScreenState extends State<LoadingScreen> {
           'selectionTimer': 30, // 30 seconds for draft phase
           'matchTimer': 60, // 60 seconds for the actual match
           'socket': SocketService.instance.socket,
+          'userData': widget.userData,
         },
       );
     });

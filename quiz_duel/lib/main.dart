@@ -43,11 +43,14 @@ class QuizRoyale extends StatelessWidget {
         '/genre': (context) => const GenreScreen(),
 
         '/loadingscreen': (context) {
-          final args = ModalRoute.of(context)!.settings.arguments as Map;
-
+          final args = ModalRoute.of(context)!.settings.arguments as Map?;
+          if (args == null) {
+            return const SplashScreen(); // redirect to splash if no args
+          }
           return LoadingScreen(
-            userId: args['userId'],
+            userId: args['userId'] ?? '',
             genres: List<int>.from(args['genres']),
+            userData: Map<String, dynamic>.from(args['userData'] ?? {}),
             // socket: SocketService.instance.socket!,
           );
         },
@@ -66,6 +69,7 @@ class QuizRoyale extends StatelessWidget {
               timer: args?['timer'],
               socket: SocketService.instance.socket!,
               amIP1: args?['amIP1'] ?? true, // default to true if not provided
+              userData: Map<String, dynamic>.from(args?['userData'] ?? {}),
             ),
           );
         }
@@ -102,6 +106,7 @@ class QuizRoyale extends StatelessWidget {
               userId: args['userId'],
               questions: args['questions'] ?? [],
               socket: SocketService.instance.socket!,
+              userData: Map<String, dynamic>.from(args['userData'] ?? {}),
             ),
           );
         }
@@ -110,15 +115,17 @@ class QuizRoyale extends StatelessWidget {
         if (settings.name == '/profile') {
           return MaterialPageRoute(
             builder: (_) => ProfileScreen(
-              userId: args?['userId'],
-              username: args?['username'],
-              tier: args?['tier'],
-              points: args?['points'],
-              matchesPlayed: args?['matchesPlayed'],
-              wins: args?['wins'],
-              draws: args?['draws'],
-              losses: args?['losses'],
-              genres: args?['genres'],
+              userId: args?['userId'] ?? '',
+              username: args?['username'] ?? '',
+              tier: args?['tier'] ?? '',
+              points: args?['points'] ?? 0,
+              matchesPlayed: args?['matchesPlayed'] ?? 0,
+              wins: args?['wins'] ?? 0,
+              draws: args?['draws'] ?? 0,
+              losses: args?['losses'] ?? 0,
+              genres: List<int>.from(
+                args?['genres'] ?? [],
+              ), //args?['genres'] ?? []
               socket: SocketService.instance.socket,
             ),
           );
@@ -140,6 +147,7 @@ class QuizRoyale extends StatelessWidget {
             builder: (_) => ResultScreen(
               gameResults: args ?? {},
               socket: SocketService.instance.socket,
+              userData: args?['userData'] ?? {},
             ),
           );
         }

@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
-// import 'package:quiz_duel/pages/homescreen.dart';
+import 'package:quiz_duel/pages/homescreen.dart';
 
 class ResultScreen extends StatefulWidget {
   // data matches backend: { results: [{userId, name, matchScore}], winner: id }
   final Map<String, dynamic> gameResults;
   final dynamic socket;
+  final Map<String, dynamic> userData;
 
   const ResultScreen({
     super.key,
     required this.gameResults,
     required this.socket,
+    required this.userData,
   });
 
   @override
@@ -28,13 +30,21 @@ class _ResultScreenState extends State<ResultScreen> {
   }
 
   void _parseResults() {
-    final List<dynamic> results = widget.gameResults['results'];
+    final List<dynamic>? results = widget.gameResults['results'];
     final String? winnerId = widget.gameResults['winner'];
 
     // Use the socket ID to identify which result entry belongs to the local player
     //final String myId = widget.socket.id ?? "";
 
     final String myId = widget.gameResults['myId'] ?? "";
+
+    if (results == null || results.isEmpty) {
+      // Redirect to home if no valid game data
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.pushReplacementNamed(context, '/');
+      });
+      return;
+    }
 
     // Find "Me" and "Opponent" in the results array
     final me = results.firstWhere(
@@ -265,9 +275,14 @@ class _ResultScreenState extends State<ResultScreen> {
           ElevatedButton(
             onPressed: () {
               // Navigate back to Home and clear the stack
-              Navigator.pushNamedAndRemoveUntil(
+              Navigator.pushAndRemoveUntil(
                 context,
-                '/home',
+                MaterialPageRoute(
+                  builder: (context) => HomeScreen(
+                    userData: widget.userData,
+                    genres: List<int>.from(widget.userData['genres'] ?? []),
+                  ),
+                ),
                 (route) => false,
               );
             },
@@ -285,7 +300,9 @@ class _ResultScreenState extends State<ResultScreen> {
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
             ),
           ),
+
           const SizedBox(height: 20),
+
           TextButton(
             onPressed: () => Navigator.pushNamedAndRemoveUntil(
               context,
