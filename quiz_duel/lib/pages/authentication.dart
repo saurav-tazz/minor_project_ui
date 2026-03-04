@@ -44,11 +44,20 @@ class _AuthScreenState extends State<AuthScreen> {
           };
 
     try {
-      final response = await http.post(
-        Uri.parse(url),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(body),
-      );
+      final response = await http
+          .post(
+            Uri.parse(url),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(body),
+          )
+          .timeout(
+            const Duration(seconds: 30),
+            onTimeout: () {
+              throw Exception('Request timed out. Please try again.');
+            },
+          );
+      print('AUTH: Response status ${response.statusCode}');
+      print('AUTH: Response body ${response.body}');
 
       final data = jsonDecode(response.body);
 
@@ -69,7 +78,8 @@ class _AuthScreenState extends State<AuthScreen> {
         _showError(data['message'] ?? 'Authentication failed');
       }
     } catch (e) {
-      _showError('Connection error. Is the server running?');
+      print('AUTH ERROR: $e');
+      _showError('Connection error. Please check your internet and try again.');
     } finally {
       setState(() => _isLoading = false);
     }
