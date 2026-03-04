@@ -122,6 +122,45 @@ publicRouter.post('/login', async (req, res) => {
     }
 });
 
+// Get randomized questions for Practice mode
+// Example: GET /api/questions/practice?genres=1,3,5&limit=5
+publicRouter.get('/questions/practice', async (req, res) => {
+    try {
+        const genreQuery = String(req.query.genres || '')
+            .split(',')
+            .map(g => Number(g.trim()))
+            .filter(g => !Number.isNaN(g));
+
+        const parsedLimit = Number(req.query.limit);
+        const limit = Number.isFinite(parsedLimit) && parsedLimit > 0
+            ? Math.min(parsedLimit, 20)
+            : 5;
+
+        const matchStage = {};
+        if (genreQuery.length > 0) {
+            matchStage.genre = { $in: genreQuery };
+        }
+
+        const questions = await Question.aggregate([
+            { $match: matchStage },
+            { $sample: { size: limit } },
+            {
+                $project: {
+                    questionText: 1,
+                    options: 1,
+                    correctAnswer: 1,
+                    genre: 1,
+                }
+            }
+        ]);
+
+        return res.status(200).json({ success: true, questions });
+    } catch (err) {
+        console.error('Practice questions fetch error:', err);
+        return res.status(500).json({ success: false, message: err.message });
+    }
+});
+
 // Apply the /api prefix to the public routes
 app.use('/api', publicRouter);
 

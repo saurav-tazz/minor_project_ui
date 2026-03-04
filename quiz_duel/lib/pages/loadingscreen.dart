@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:quiz_duel/pages/questionSelection.dart';
+// import 'package:quiz_duel/pages/questionSelection.dart';
 import 'package:quiz_duel/services/socket_service.dart';
+// import 'package:quiz_duel/pages/homescreen.dart';
 
 class LoadingScreen extends StatefulWidget {
   final String userId;
@@ -85,19 +86,20 @@ class _LoadingScreenState extends State<LoadingScreen> {
       Navigator.pop(context);
     });
 
-    _fallbackTimer = Timer(const Duration(seconds: 5), () {
+    _fallbackTimer = Timer(const Duration(seconds: 30), () {
       if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => QuestionSelectionScreen(
-              roomId: "fallback-room", // placeholder
-              userId: widget.userId,
-              inventory: [], // no inventory yet
-              timer: 20,
-              socket: SocketService.instance.socket!,
-              amIP1: true, // assume player 1 for fallback
-            ),
+        SocketService.instance.socket?.emit('cancel_match', {
+          'userId': widget.userId,
+        });
+
+        Navigator.pop(context);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("No opponent found. Please try again! 😔"),
+            duration: Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+            margin: EdgeInsets.all(15),
           ),
         );
       }

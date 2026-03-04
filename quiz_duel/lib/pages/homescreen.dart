@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:quiz_duel/widgets/logo.dart';
-import 'package:quiz_duel/services/socket_service.dart';
+// import 'package:quiz_duel/services/socket_service.dart';
 
 class HomeScreen extends StatefulWidget {
   final List<int> genres;
@@ -32,8 +32,8 @@ class _HomeScreenState extends State<HomeScreen> {
     // Extracting stats from userData or providing defaults
     final String username =
         currentUserData['username'] ?? currentUserData['name'] ?? 'Player';
-    final String level = currentUserData['level'] ?? 'noob';
-    final Map stats = currentUserData['stats'] ?? {};
+    // final String level = currentUserData['level'] ?? 'noob';
+    // final Map stats = currentUserData['stats'] ?? {};
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
@@ -139,9 +139,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     "Solo Play",
                     Icons.school,
                     Colors.purple,
-                    () => _navigateTo(context, '/matchroom', {
-                      'userId': widget.userData['_id'],
-                      'genres': widget.genres,
+                    () => _navigateTo(context, '/practice', {
+                      'genres': currentGenres,
+                      'userData': currentUserData,
                     }),
                   ),
                   _buildModeCard(

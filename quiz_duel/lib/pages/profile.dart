@@ -250,22 +250,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Wrap(
                       spacing: 10,
                       runSpacing: 10,
-                      children: selectedGenres.map((g) {
-                        final label = genreLabels[g] ?? "Unknown";
-                        return Chip(
-                          label: Text(label),
-                          backgroundColor: Colors.white,
-                          side: const BorderSide(color: Color(0xFFE0E0E0)),
-                          labelStyle: const TextStyle(
-                            color: Color(0xFF1E88E5),
-                            fontWeight: FontWeight.bold,
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 5,
-                          ),
-                        );
-                      }).toList(),
+                      children: selectedGenres
+                          .asMap()
+                          .entries
+                          .where(
+                            (entry) => entry.value == 1,
+                          ) // only 1 = selected
+                          .map((entry) {
+                            final g = entry.key;
+                            final label = genreLabels[g] ?? "Unknown";
+                            return Chip(
+                              label: Text(label),
+                              backgroundColor: Colors.white,
+                              side: const BorderSide(color: Color(0xFFE0E0E0)),
+                              labelStyle: const TextStyle(
+                                color: Color(0xFF1E88E5),
+                                fontWeight: FontWeight.bold,
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 5,
+                              ),
+                            );
+                          })
+                          .toList(),
                     ),
                     const SizedBox(height: 50),
                   ],
@@ -317,7 +325,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _editGenres() async {
     final List<int> allGenres = genreLabels.keys.toList();
-    final Set<int> selected = Set<int>.from(selectedGenres); // use local copy
+
+    // Convert binary array to selected indexes
+    final Set<int> selected = selectedGenres
+        .asMap()
+        .entries
+        .where((entry) => entry.value == 1)
+        .map((entry) => entry.key)
+        .toSet();
 
     final result = await showDialog<List<int>>(
       context: context,
@@ -337,19 +352,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       onChanged: (val) {
                         setStateDialog(() {
                           if (val == true) {
-                            // If you want to enforce a max of 3 genres, uncomment below:
-                            // if (selected.length < 3) {
-                            //   selected.add(g);
-                            // } else {
-                            //   ScaffoldMessenger.of(context).showSnackBar(
-                            //     const SnackBar(
-                            //       content: Text("Maximum 3 genres allowed"),
-                            //       duration: Duration(seconds: 2),
-                            //     ),
-                            //   );
-                            // }
-
-                            // For now, allow any number of genres:
                             selected.add(g);
                           } else {
                             selected.remove(g);
@@ -377,13 +379,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
 
     if (result != null) {
-      // Update local state so Chips refresh immediately
+      // Convert selected indexes BACK to binary array
+      final List<int> updatedBinary = List.filled(10, 0);
+      for (var g in result) {
+        updatedBinary[g] = 1;
+      }
+
       setState(() {
-        selectedGenres = result;
+        selectedGenres = updatedBinary;
       });
 
-      // Persist changes to backend
-      await _syncGenresWithServer(result);
+      await _syncGenresWithServer(updatedBinary);
     }
   }
 

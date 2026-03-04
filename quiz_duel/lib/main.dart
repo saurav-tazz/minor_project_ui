@@ -8,6 +8,7 @@ import 'package:quiz_duel/pages/resultscreen.dart';
 import 'package:quiz_duel/pages/questionSelection.dart';
 import 'package:quiz_duel/pages/loadingscreen.dart';
 import 'package:quiz_duel/pages/matchroom.dart';
+import 'package:quiz_duel/pages/practice.dart';
 
 import 'package:quiz_duel/services/socket_service.dart';
 import 'package:quiz_duel/services/api_service.dart';
@@ -148,6 +149,16 @@ class QuizRoyale extends StatelessWidget {
               gameResults: args ?? {},
               socket: SocketService.instance.socket,
               userData: args?['userData'] ?? {},
+            ),
+          );
+        }
+
+        // ✅ PRACTICE
+        if (settings.name == '/practice') {
+          return MaterialPageRoute(
+            builder: (_) => PracticeScreen(
+              genres: List<int>.from(args?['genres'] ?? []),
+              userData: Map<String, dynamic>.from(args?['userData'] ?? {}),
             ),
           );
         }

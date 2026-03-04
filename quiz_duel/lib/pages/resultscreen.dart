@@ -20,7 +20,9 @@ class ResultScreen extends StatefulWidget {
 
 class _ResultScreenState extends State<ResultScreen> {
   late String playerName, opponentName;
-  late int playerPoints, opponentPoints;
+  late int playerCorrect, opponentCorrect;
+  late int playerMatchScore, opponentMatchScore;
+  late int playerTotal, opponentTotal;
   late bool playerWon, draw;
 
   @override
@@ -65,15 +67,16 @@ class _ResultScreenState extends State<ResultScreen> {
       playerName = me['name'] ?? "You";
       opponentName = op['name'] ?? "Opponent";
 
-      // matchScore calculated by backend: (correct * 10) + (wrong * -5)
-      playerPoints = me['matchScore'] ?? 0;
-      opponentPoints = op['matchScore'] ?? 0;
+      playerCorrect = me['correct'] ?? 0;
+      opponentCorrect = op['correct'] ?? 0;
+      playerTotal = me['total'] ?? 5;
+      opponentTotal = op['total'] ?? 5;
+      playerMatchScore = me['matchScore'] ?? 0;
+      opponentMatchScore = op['matchScore'] ?? 0;
 
-      // draw = winnerId == null || winnerId == "draw";
-      // playerWon = !draw && winnerId == me['userId'];
       if (winnerId == "draw" ||
           winnerId == null ||
-          playerPoints == opponentPoints) {
+          playerMatchScore == opponentMatchScore) {
         draw = true;
         playerWon = false;
       } else {
@@ -139,7 +142,8 @@ class _ResultScreenState extends State<ResultScreen> {
                       child: _playerCard(
                         name: playerName,
                         tag: "YOU",
-                        points: playerPoints,
+                        correct: playerCorrect,
+                        total: playerTotal,
                         isWinner: playerWon,
                         color: Colors.blueAccent,
                       ),
@@ -159,7 +163,8 @@ class _ResultScreenState extends State<ResultScreen> {
                       child: _playerCard(
                         name: opponentName,
                         tag: "OPP",
-                        points: opponentPoints,
+                        correct: opponentCorrect,
+                        total: opponentTotal,
                         isWinner: !playerWon && !draw,
                         color: Colors.redAccent,
                       ),
@@ -212,7 +217,8 @@ class _ResultScreenState extends State<ResultScreen> {
   Widget _playerCard({
     required String name,
     required String tag,
-    required int points,
+    required int correct,
+    required int total,
     required bool isWinner,
     required Color color,
   }) {
@@ -247,7 +253,7 @@ class _ResultScreenState extends State<ResultScreen> {
           ),
           const Divider(height: 25),
           Text(
-            "$points",
+            "$correct/$total",
             style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 28,
@@ -255,7 +261,7 @@ class _ResultScreenState extends State<ResultScreen> {
             ),
           ),
           const Text(
-            "POINTS",
+            "CORRECT ANSWERS",
             style: TextStyle(
               fontSize: 10,
               color: Colors.grey,
