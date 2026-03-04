@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:quiz_duel/widgets/logo.dart';
-// import 'package:quiz_duel/services/socket_service.dart';
+import 'package:quiz_duel/services/socket_service.dart';
 
 class HomeScreen extends StatefulWidget {
   final List<int> genres;
@@ -21,6 +21,40 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     currentGenres = widget.genres;
     currentUserData = widget.userData;
+    _listenForStatsUpdate(); // Listen for real-time stats updates
+  }
+
+  void _listenForStatsUpdate() {
+    SocketService.instance.socket?.on('stats_update', (data) {
+      if (mounted) {
+        setState(() {
+          final updatedStats = {
+            ...((currentUserData['stats'] as Map?) ?? {}),
+            'totalPoints':
+                data['points'] ?? currentUserData['stats']?['totalPoints'] ?? 0,
+            'matchesPlayed':
+                data['matchesPlayed'] ??
+                currentUserData['stats']?['matchesPlayed'] ??
+                0,
+            'wins': data['wins'] ?? currentUserData['stats']?['wins'] ?? 0,
+            'losses':
+                data['losses'] ?? currentUserData['stats']?['losses'] ?? 0,
+            'draws': data['draws'] ?? currentUserData['stats']?['draws'] ?? 0,
+          };
+          currentUserData = {
+            ...currentUserData,
+            'stats': updatedStats,
+            'level': data['tier'] ?? currentUserData['level'],
+          };
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    SocketService.instance.socket?.off('stats_update');
+    super.dispose();
   }
 
   void _navigateTo(BuildContext context, String route, Object? args) {
@@ -127,7 +161,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     "Play Friends",
                     Icons.group,
                     Colors.orange,
-                    () => _navigateTo(context, '/matchroom', {
+                    () => _navigateTo(context, '/challenge', {
                       'userId': widget.userData['_id'],
                       'genres': widget.genres,
                       'userData': widget.userData,
@@ -150,7 +184,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     "Top Players",
                     Icons.leaderboard,
                     Colors.green,
-                    () => {}, // To be implemented
+                    () => Navigator.pushNamed(
+                      context,
+                      '/leaderboard',
+                      arguments: {'userId': currentUserData['_id'] ?? ''},
+                    ), // To be implemented
                   ),
                 ],
               ),

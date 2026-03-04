@@ -42,21 +42,32 @@ class _QuestionSelectionScreenState extends State<QuestionSelectionScreen> {
     // Listen for the server to confirm both players are ready to start the match
     widget.socket.on('start_duel', (data) {
       if (mounted) {
-        _timer?.cancel(); // Ensure timer is stopped
+        _timer?.cancel();
 
-        // Pick this player's questions based on which player they are
-        final myQuestions = widget.amIP1
+        // Debug — remove after confirming fix
+        print('start_duel received keys: ${data.keys.toList()}');
+        print('amIP1: ${widget.amIP1}');
+        print('p1Questions count: ${data['p1Questions']?.length}');
+        print('p2Questions count: ${data['p2Questions']?.length}');
+
+        final rawQuestions = widget.amIP1
             ? data['p1Questions']
             : data['p2Questions'];
 
-        // Navigate to /matchroom using the arguments your main.dart expects
+        // Safely cast to List<dynamic>, fallback to empty list
+        final myQuestions = rawQuestions != null
+            ? List<dynamic>.from(rawQuestions)
+            : <dynamic>[];
+
+        print('myQuestions going to matchroom: ${myQuestions.length}');
+
         Navigator.pushReplacementNamed(
           context,
           '/matchroom',
           arguments: {
             'roomId': widget.roomId,
             'userId': widget.userId,
-            'questions': myQuestions, // Use the player-specific questions
+            'questions': myQuestions,
             'userData': widget.userData,
           },
         );

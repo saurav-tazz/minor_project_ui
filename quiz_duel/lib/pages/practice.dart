@@ -162,18 +162,26 @@ class _PracticeScreenState extends State<PracticeScreen> {
   // ── Loading Screen ─────────────────────────────────────
   Widget _buildLoading() {
     return Scaffold(
-      backgroundColor: const Color(0xFF7C3AED),
-      body: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(color: Colors.white),
-            SizedBox(height: 20),
-            Text(
-              "Loading questions...",
-              style: TextStyle(color: Colors.white, fontSize: 16),
-            ),
-          ],
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF1E88E5), Color(0xFF42A5F5)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(color: Colors.white),
+              SizedBox(height: 20),
+              Text(
+                "Loading questions...",
+                style: TextStyle(color: Colors.white, fontSize: 16),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -182,23 +190,38 @@ class _PracticeScreenState extends State<PracticeScreen> {
   // ── Error Screen ───────────────────────────────────────
   Widget _buildError() {
     return Scaffold(
-      backgroundColor: const Color(0xFF7C3AED),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, color: Colors.white, size: 60),
-            const SizedBox(height: 20),
-            Text(
-              errorMessage!,
-              style: const TextStyle(color: Colors.white, fontSize: 16),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _fetchQuestions,
-              child: const Text("Try Again"),
-            ),
-          ],
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF1E88E5), Color(0xFF42A5F5)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, color: Colors.white, size: 60),
+              const SizedBox(height: 20),
+              Text(
+                errorMessage!,
+                style: const TextStyle(color: Colors.white, fontSize: 16),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: _fetchQuestions,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: const Color(0xFF1E88E5),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text("Try Again"),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -213,7 +236,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFF7C3AED), Color(0xFF4F46E5)],
+            colors: [Color(0xFF1E88E5), Color(0xFF42A5F5)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -311,6 +334,13 @@ class _PracticeScreenState extends State<PracticeScreen> {
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.08),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
                   child: Text(
                     question['questionText'],
@@ -428,7 +458,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
         width: double.infinity,
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFF7C3AED), Color(0xFF4F46E5)],
+            colors: [Color(0xFF1E88E5), Color(0xFF42A5F5)],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
@@ -457,6 +487,13 @@ class _PracticeScreenState extends State<PracticeScreen> {
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.08),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
                   child: Column(
                     children: [
@@ -465,7 +502,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
                         style: const TextStyle(
                           fontSize: 48,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF7C3AED),
+                          color: Color(0xFF1E88E5),
                         ),
                       ),
                       const SizedBox(height: 20),
@@ -506,7 +543,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
                   onPressed: _fetchQuestions,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
-                    foregroundColor: const Color(0xFF7C3AED),
+                    foregroundColor: const Color(0xFF1E88E5),
                     minimumSize: const Size(double.infinity, 60),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20),

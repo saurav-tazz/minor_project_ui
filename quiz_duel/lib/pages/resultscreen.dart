@@ -302,27 +302,27 @@ class _ResultScreenState extends State<ResultScreen> {
               elevation: 5,
             ),
             child: const Text(
-              "PLAY AGAIN",
+              "BACK TO HOME",
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
             ),
           ),
 
           const SizedBox(height: 20),
 
-          TextButton(
-            onPressed: () => Navigator.pushNamedAndRemoveUntil(
-              context,
-              '/home',
-              (route) => false,
-            ),
-            child: const Text(
-              "EXIT TO DASHBOARD",
-              style: TextStyle(
-                color: Colors.white70,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
+          // TextButton(
+          //   onPressed: () => Navigator.pushNamedAndRemoveUntil(
+          //     context,
+          //     '/home',
+          //     (route) => false,
+          //   ),
+          //   child: const Text(
+          //     "EXIT TO DASHBOARD",
+          //     style: TextStyle(
+          //       color: Colors.white70,
+          //       fontWeight: FontWeight.w600,
+          //     ),
+          //   ),
+          // ),
         ],
       ),
     );

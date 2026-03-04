@@ -8,7 +8,9 @@ import 'package:quiz_duel/pages/resultscreen.dart';
 import 'package:quiz_duel/pages/questionSelection.dart';
 import 'package:quiz_duel/pages/loadingscreen.dart';
 import 'package:quiz_duel/pages/matchroom.dart';
+import 'package:quiz_duel/pages/challengelobby.dart';
 import 'package:quiz_duel/pages/practice.dart';
+import 'package:quiz_duel/pages/leaderboard.dart';
 
 import 'package:quiz_duel/services/socket_service.dart';
 import 'package:quiz_duel/services/api_service.dart';
@@ -75,17 +77,6 @@ class QuizRoyale extends StatelessWidget {
           );
         }
 
-        //MATCHROOM (DUEL SCREEN)
-        // if (settings.name == '/matchroom') {
-        //   return MaterialPageRoute(
-        //     builder: (_) => MatchRoomScreen(
-        //       roomId: args?['roomId'],
-        //       userId: args?['userId'],
-        //       questions: args?['questions'] ?? [],
-        //       socket: SocketService.instance.socket!,
-        //     ),
-        //   );
-        // }
         //MATCHROOM (DUEL SCREEN) with argument validation
         if (settings.name == '/matchroom') {
           final args = settings.arguments as Map<String, dynamic>?;
@@ -153,6 +144,14 @@ class QuizRoyale extends StatelessWidget {
           );
         }
 
+        if (settings.name == '/challenge') {
+          return MaterialPageRoute(
+            builder: (_) => ChallengeLobbyScreen(
+              userData: Map<String, dynamic>.from(args ?? {}),
+            ),
+          );
+        }
+
         // ✅ PRACTICE
         if (settings.name == '/practice') {
           return MaterialPageRoute(
@@ -160,6 +159,13 @@ class QuizRoyale extends StatelessWidget {
               genres: List<int>.from(args?['genres'] ?? []),
               userData: Map<String, dynamic>.from(args?['userData'] ?? {}),
             ),
+          );
+        }
+
+        if (settings.name == '/leaderboard') {
+          return MaterialPageRoute(
+            builder: (_) =>
+                LeaderboardScreen(currentUserId: args?['userId'] ?? ''),
           );
         }
 

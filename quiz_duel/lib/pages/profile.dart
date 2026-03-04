@@ -58,6 +58,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     _initializeStats();
+    _fetchLatestStats(); // ADD
     selectedGenres = List.from(widget.genres); // local copy for editing
 
     // 🔹 LISTENER: Handle Real-time Stats Updates from the Server
@@ -91,6 +92,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
     currentWins = widget.wins;
     currentDraws = widget.draws;
     currentLosses = widget.losses;
+  }
+
+  Future<void> _fetchLatestStats() async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+          'https://quiz-royale-ash0.onrender.com/api/users/${widget.userId}',
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final user = data['user'];
+        final stats = user['stats'] ?? {};
+
+        if (mounted) {
+          setState(() {
+            currentPoints = stats['totalPoints'] ?? currentPoints;
+            currentTier = user['level'] ?? currentTier;
+            currentMatchesPlayed =
+                stats['matchesPlayed'] ?? currentMatchesPlayed;
+            currentWins = stats['wins'] ?? currentWins;
+            currentDraws = stats['draws'] ?? currentDraws;
+            currentLosses = stats['losses'] ?? currentLosses;
+          });
+        }
+      }
+    } catch (e) {
+      // silently fail, existing stats remain shown
+      print('Failed to fetch latest stats: $e');
+    }
   }
 
   @override

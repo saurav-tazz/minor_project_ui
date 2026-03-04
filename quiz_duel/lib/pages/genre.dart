@@ -46,9 +46,11 @@ class _GenreScreenState extends State<GenreScreen> {
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getString('userId');
 
-      final selectedGenreIds = selectedIndexes
-          .map((i) => genres[i]['id'])
-          .toList();
+      final List<int> genreVector = List.filled(10, 0);
+      for (var i in selectedIndexes) {
+        final id = genres[i]['id'] as int;
+        genreVector[id] = 1;
+      }
 
       final response = await http.post(
         Uri.parse(
@@ -57,7 +59,7 @@ class _GenreScreenState extends State<GenreScreen> {
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'userId': userId,
-          'preferredGenres': selectedGenreIds, // Matches backend key
+          'preferredGenres': genreVector, // Matches backend key
         }),
       );
 
@@ -68,7 +70,10 @@ class _GenreScreenState extends State<GenreScreen> {
         Navigator.pushReplacementNamed(
           context,
           '/home',
-          arguments: data['user'],
+          arguments: {
+            ...Map<String, dynamic>.from(data['user']),
+            'username': data['user']['name'], // ADD
+          },
         );
       } else {
         throw Exception('Failed to save preferences');
