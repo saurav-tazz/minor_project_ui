@@ -27,7 +27,9 @@ class _JoinRoomScreenState extends State<JoinRoomScreen> {
       if (!mounted) return;
       setState(() => _isJoining = false);
 
-      final bool amIP1 = data['p1']['id'] == widget.userData['userId'];
+      final bool amIP1 =
+          data['p1']['id'] == widget.userData['_id']?.toString() ||
+          data['p1']['id'] == widget.userData['userId']?.toString();
       final myInventory = amIP1
           ? data['p1']['inventory']
           : data['p2']['inventory'];
@@ -41,14 +43,18 @@ class _JoinRoomScreenState extends State<JoinRoomScreen> {
         '/questionSelection',
         arguments: {
           'roomId': data['roomId'],
-          'userId': widget.userData['userId'],
+          'userId':
+              widget.userData['_id']?.toString() ??
+              widget.userData['userId']?.toString(),
           'inventory': myInventory,
           'timer': data['timer'],
           'opponentName': opponentName,
           'amIP1': amIP1,
           'userData': {
             ...innerUserData,
-            '_id': widget.userData['userId'],
+            '_id':
+                widget.userData['_id']?.toString() ??
+                widget.userData['userId']?.toString(),
             'username': innerUserData['username'] ?? innerUserData['name'],
           },
         },
@@ -83,7 +89,9 @@ class _JoinRoomScreenState extends State<JoinRoomScreen> {
     setState(() => _isJoining = true);
 
     SocketService.instance.socket?.emit('join_room', {
-      'userId': widget.userData['userId'] ?? widget.userData['userId'],
+      'userId':
+          widget.userData['_id']?.toString() ??
+          widget.userData['userId']?.toString(),
       'code': code,
     });
 

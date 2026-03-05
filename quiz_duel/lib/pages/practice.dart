@@ -35,7 +35,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
   Timer? _timer;
 
   static const int totalQuestions =
-      5; // change this number to adjust question count
+      10; // change this number to adjust question count
 
   // ── Lifecycle ──────────────────────────────────────────
   @override

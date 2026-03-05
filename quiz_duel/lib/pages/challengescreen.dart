@@ -41,7 +41,9 @@ class _ChallengeScreenState extends State<ChallengeScreen> {
       if (!mounted) return;
       _countdownTimer?.cancel();
 
-      final bool amIP1 = data['p1']['userId'] == widget.userData['userId'];
+      final bool amIP1 =
+          data['p1']['id'] == widget.userData['_id']?.toString() ||
+          data['p1']['id'] == widget.userData['userId']?.toString();
       final myInventory = amIP1
           ? data['p1']['inventory']
           : data['p2']['inventory'];
@@ -54,14 +56,18 @@ class _ChallengeScreenState extends State<ChallengeScreen> {
         '/questionSelection',
         arguments: {
           'roomId': data['roomId'],
-          'userId': widget.userData['userId'],
+          'userId':
+              widget.userData['_id']?.toString() ??
+              widget.userData['userId']?.toString(),
           'inventory': myInventory,
           'timer': data['timer'],
           'opponentName': opponentName,
           'amIP1': amIP1,
           'userData': {
             ...innerUserData,
-            '_id': widget.userData['userId'],
+            '_id':
+                widget.userData['_id']?.toString() ??
+                widget.userData['userId']?.toString(),
             'username': innerUserData['username'] ?? innerUserData['name'],
           },
         },
@@ -91,8 +97,9 @@ class _ChallengeScreenState extends State<ChallengeScreen> {
     print("USER ID SENT: ${widget.userData['userId']}");
     SocketService.instance.socket?.emit('create_room', {
       'userId':
-          widget.userData['userId'] ??
-          widget.userData['userId'], // Try both keys for compatibility
+          widget.userData['_id']?.toString() ??
+          widget.userData['userId']
+              ?.toString(), // Try both keys for compatibility
     });
   }
 
