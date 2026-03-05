@@ -127,71 +127,81 @@ class _LoadingScreenState extends State<LoadingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF1E88E5),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.people_alt,
-                  size: 50,
-                  color: Color(0xFF1E88E5),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  "Finding Your Opponent",
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
+    return WillPopScope(
+      onWillPop: () async {
+        SocketService.instance.socket?.emit('leave_lobby', {
+          'userId': widget.userId,
+        });
+        _timer?.cancel();
+        _fallbackTimer?.cancel();
+        return true;
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFF1E88E5),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.people_alt,
+                    size: 50,
+                    color: Color(0xFF1E88E5),
                   ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  "Found potential matches...",
-                  style: TextStyle(fontSize: 14, color: Colors.grey),
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildPlayerCircle("You", Colors.blue),
-                    const CircularProgressIndicator(color: Colors.blue),
-                    _buildPlayerCircle(opponentName, Colors.green),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                LinearProgressIndicator(
-                  value: progress / 100,
-                  backgroundColor: Colors.grey[300],
-                  color: Colors.blue,
-                  minHeight: 8,
-                ),
-                const SizedBox(height: 8),
-                Text("${progress.toInt()}%"),
-                const SizedBox(height: 16),
-                Row(
-                  children: const [
-                    Icon(Icons.lightbulb, size: 16, color: Colors.orange),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        "Tip: Answer quickly to earn bonus points!",
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
-                      ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    "Finding Your Opponent",
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
                     ),
-                  ],
-                ),
-              ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    "Found potential matches...",
+                    style: TextStyle(fontSize: 14, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildPlayerCircle("You", Colors.blue),
+                      const CircularProgressIndicator(color: Colors.blue),
+                      _buildPlayerCircle(opponentName, Colors.green),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  LinearProgressIndicator(
+                    value: progress / 100,
+                    backgroundColor: Colors.grey[300],
+                    color: Colors.blue,
+                    minHeight: 8,
+                  ),
+                  const SizedBox(height: 8),
+                  Text("${progress.toInt()}%"),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: const [
+                      Icon(Icons.lightbulb, size: 16, color: Colors.orange),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          "Tip: Answer quickly to earn bonus points!",
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),

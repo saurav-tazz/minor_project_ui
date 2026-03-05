@@ -73,6 +73,50 @@ class _QuestionSelectionScreenState extends State<QuestionSelectionScreen> {
         );
       }
     });
+
+    widget.socket.on('opponent_left', (data) {
+      if (mounted) {
+        _timer?.cancel();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Opponent disconnected. You win!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+        Future.delayed(const Duration(seconds: 3), () {
+          if (mounted) {
+            Navigator.pushReplacementNamed(
+              context,
+              '/home',
+              arguments: widget.userData,
+            );
+          }
+        });
+      }
+    });
+
+    widget.socket.on('opponent_forfeited', (data) {
+      if (mounted) {
+        _timer?.cancel();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Opponent forfeited. You win!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+        Future.delayed(const Duration(seconds: 3), () {
+          if (mounted) {
+            Navigator.pushReplacementNamed(
+              context,
+              '/home',
+              arguments: widget.userData,
+            );
+          }
+        });
+      }
+    });
   }
 
   // 3/3/2026--autosubmit if time runs out before user selects 5 questions. Fills remaining slots with random inventory items.
@@ -138,21 +182,55 @@ class _QuestionSelectionScreenState extends State<QuestionSelectionScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    widget.socket.off('start_duel');
+    widget.socket.off('opponent_left');
+    widget.socket.off('opponent_forfeited');
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF00A3FF), // Match UI Blue
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(),
-            _buildSelectionProgress(),
-            Expanded(child: _buildQuestionList()),
-            _buildBottomButton(),
-          ],
+    return WillPopScope(
+      onWillPop: () async {
+        final shouldLeave = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Leave Match?'),
+            content: const Text(
+              'Leaving will be counted as a loss. Are you sure?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Leave', style: TextStyle(color: Colors.red)),
+              ),
+            ],
+          ),
+        );
+        if (shouldLeave == true) {
+          widget.socket.emit('forfeit', {
+            'roomId': widget.roomId,
+            'userId': widget.userId,
+          });
+          return true;
+        }
+        return false;
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFF00A3FF), // Match UI Blue
+        body: SafeArea(
+          child: Column(
+            children: [
+              _buildHeader(),
+              _buildSelectionProgress(),
+              Expanded(child: _buildQuestionList()),
+              _buildBottomButton(),
+            ],
+          ),
         ),
       ),
     );

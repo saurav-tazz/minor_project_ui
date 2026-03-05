@@ -48,6 +48,50 @@ class _MatchRoomScreenState extends State<MatchRoomScreen> {
         );
       }
     });
+
+    widget.socket.on('opponent_left', (data) {
+      if (mounted) {
+        _timer?.cancel();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Opponent disconnected. You win!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+        Future.delayed(const Duration(seconds: 3), () {
+          if (mounted) {
+            Navigator.pushReplacementNamed(
+              context,
+              '/home',
+              arguments: widget.userData,
+            );
+          }
+        });
+      }
+    });
+
+    widget.socket.on('opponent_forfeited', (data) {
+      if (mounted) {
+        _timer?.cancel();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Opponent forfeited. You win!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+        Future.delayed(const Duration(seconds: 3), () {
+          if (mounted) {
+            Navigator.pushReplacementNamed(
+              context,
+              '/home',
+              arguments: widget.userData,
+            );
+          }
+        });
+      }
+    });
   }
 
   void _startQuestionTimer() {
@@ -154,16 +198,15 @@ class _MatchRoomScreenState extends State<MatchRoomScreen> {
   @override
   void dispose() {
     _timer?.cancel();
-    // Stop listening to game_over before the widget is destroyed
     widget.socket.off('game_over');
+    widget.socket.off('opponent_left');
+    widget.socket.off('opponent_forfeited');
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    // if (widget.questions.isEmpty) {
-    //   return const Scaffold(body: Center(child: Text("No questions found.")));
-    // }
+    //TESTING: If no questions passed, show a simple screen with a button to jump to results (to test result screen without going through actual quiz flow)
     if (widget.questions.isEmpty) {
       return Scaffold(
         body: Center(
@@ -174,7 +217,7 @@ class _MatchRoomScreenState extends State<MatchRoomScreen> {
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: () {
-                  // 🚀 MANUALLY JUMP TO RESULTS
+                  //MANUALLY JUMP TO RESULTS
                   Navigator.pushReplacementNamed(
                     context,
                     '/resultscreen',
@@ -205,162 +248,194 @@ class _MatchRoomScreenState extends State<MatchRoomScreen> {
 
     final question = widget.questions[currentIndex];
 
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF21A1F1), Color(0xFF2563EB)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+    return WillPopScope(
+      onWillPop: () async {
+        final shouldLeave = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Leave Match?'),
+            content: const Text(
+              'Leaving will be counted as a loss. Are you sure?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Leave'),
+              ),
+            ],
           ),
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                /// 🔹 Top Scoreboard
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      /// You
-                      // Column(
-                      //   children: [
-                      //     const Text(
-                      //       "You",
-                      //       style: TextStyle(color: Colors.white70),
-                      //     ),
-                      //     Text(
-                      //       "$score pts",
-                      //       style: const TextStyle(
-                      //         color: Colors.white,
-                      //         fontWeight: FontWeight.bold,
-                      //       ),
-                      //     ),
-                      //   ],
-                      // ),
+        );
 
-                      /// Timer Circle
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Text(
-                          "${timeLeft}s",
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
+        if (shouldLeave == true) {
+          widget.socket.emit('forfeit', {
+            'userId': widget.userId,
+            'roomId': widget.roomId,
+          });
+          return true;
+        }
+        return false;
+      },
+      child: Scaffold(
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF21A1F1), Color(0xFF2563EB)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  /// 🔹 Top Scoreboard
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        /// You
+                        // Column(
+                        //   children: [
+                        //     const Text(
+                        //       "You",
+                        //       style: TextStyle(color: Colors.white70),
+                        //     ),
+                        //     Text(
+                        //       "$score pts",
+                        //       style: const TextStyle(
+                        //         color: Colors.white,
+                        //         fontWeight: FontWeight.bold,
+                        //       ),
+                        //     ),
+                        //   ],
+                        // ),
+
+                        /// Timer Circle
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            shape: BoxShape.circle,
                           ),
-                        ),
-                      ),
-
-                      /// Opponent Placeholder
-                      // Column(
-                      //   children: const [
-                      //     Text(
-                      //       "Opponent",
-                      //       style: TextStyle(color: Colors.white70),
-                      //     ),
-                      //     Text(
-                      //       "0 pts",
-                      //       style: TextStyle(
-                      //         color: Colors.white,
-                      //         fontWeight: FontWeight.bold,
-                      //       ),
-                      //     ),
-                      //   ],
-                      // ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 25),
-
-                /// 🔹 Question Card
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "Question ${currentIndex + 1} of ${widget.questions.length}",
-                        style: const TextStyle(
-                          color: Colors.black54,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        question['questionText'],
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                /// 🔹 Options
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: question['options'].length,
-                    itemBuilder: (context, i) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.grey.shade200,
-                            foregroundColor: Colors.black87,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(15),
-                            ),
-                            elevation: 0,
-                          ),
-                          onPressed: () => _handleAnswer(i),
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              "${String.fromCharCode(65 + i)}. ${question['options'][i]}",
-                              style: const TextStyle(fontSize: 16),
+                          child: Text(
+                            "${timeLeft}s",
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),
-                      );
-                    },
-                  ),
-                ),
 
-                /// 🔹 Bottom Progress Bar
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: LinearProgressIndicator(
-                    value: (currentIndex + 1) / widget.questions.length,
-                    minHeight: 8,
-                    backgroundColor: Colors.white24,
-                    valueColor: const AlwaysStoppedAnimation<Color>(
-                      Colors.black87,
+                        /// Opponent Placeholder
+                        // Column(
+                        //   children: const [
+                        //     Text(
+                        //       "Opponent",
+                        //       style: TextStyle(color: Colors.white70),
+                        //     ),
+                        //     Text(
+                        //       "0 pts",
+                        //       style: TextStyle(
+                        //         color: Colors.white,
+                        //         fontWeight: FontWeight.bold,
+                        //       ),
+                        //     ),
+                        //   ],
+                        // ),
+                      ],
                     ),
                   ),
-                ),
-              ],
+
+                  const SizedBox(height: 25),
+
+                  /// 🔹 Question Card
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "Question ${currentIndex + 1} of ${widget.questions.length}",
+                          style: const TextStyle(
+                            color: Colors.black54,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          question['questionText'],
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  /// 🔹 Options
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: question['options'].length,
+                      itemBuilder: (context, i) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.grey.shade200,
+                              foregroundColor: Colors.black87,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(15),
+                              ),
+                              elevation: 0,
+                            ),
+                            onPressed: () => _handleAnswer(i),
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                "${String.fromCharCode(65 + i)}. ${question['options'][i]}",
+                                style: const TextStyle(fontSize: 16),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+
+                  /// 🔹 Bottom Progress Bar
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: LinearProgressIndicator(
+                      value: (currentIndex + 1) / widget.questions.length,
+                      minHeight: 8,
+                      backgroundColor: Colors.white24,
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        Colors.black87,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
