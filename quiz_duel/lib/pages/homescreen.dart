@@ -66,8 +66,6 @@ class _HomeScreenState extends State<HomeScreen> {
     // Extracting stats from userData or providing defaults
     final String username =
         currentUserData['username'] ?? currentUserData['name'] ?? 'Player';
-    // final String level = currentUserData['level'] ?? 'noob';
-    // final Map stats = currentUserData['stats'] ?? {};
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(

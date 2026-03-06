@@ -272,6 +272,8 @@ class _PracticeScreenState extends State<PracticeScreen> {
                     ),
                     // Timer circle
                     Container(
+                      width: 60,
+                      height: 60,
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
                         color: timeLeft <= 3
@@ -279,11 +281,14 @@ class _PracticeScreenState extends State<PracticeScreen> {
                             : Colors.white.withOpacity(0.2),
                         shape: BoxShape.circle,
                       ),
-                      child: Text(
-                        "${timeLeft}s",
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
+                      child: Center(
+                        child: Text(
+                          "${timeLeft}s",
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 24,
+                          ),
                         ),
                       ),
                     ),

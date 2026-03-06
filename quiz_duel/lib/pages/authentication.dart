@@ -33,8 +33,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
     final body = isLogin
         ? {
-            'username': _loginEmailController.text
-                .trim(), // backend expects username
+            'username': _loginEmailController.text.trim(),
             'password': _loginPasswordController.text,
           }
         : {
@@ -56,22 +55,25 @@ class _AuthScreenState extends State<AuthScreen> {
               throw Exception('Request timed out. Please try again.');
             },
           );
+
       print('AUTH: Response status ${response.statusCode}');
       print('AUTH: Response body ${response.body}');
 
       final data = jsonDecode(response.body);
 
-      // if (data['success'] == true && data['user'] != null)
       if ((response.statusCode == 200 || response.statusCode == 201) &&
           data['user'] != null) {
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('userId', data['user']['_id']);
+        await prefs.setString('userId', data['user']['_id'].toString());
 
         if (!mounted) return;
 
+        final genres = List<int>.from(data['user']['genres'] ?? []);
+        final bool needsGenreSetup = genres.every((g) => g == 0);
+
         Navigator.pushReplacementNamed(
           context,
-          isLogin ? '/home' : '/genre',
+          needsGenreSetup ? '/genre' : '/home',
           arguments: data['user'],
         );
       } else {
