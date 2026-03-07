@@ -4,7 +4,6 @@ import 'package:quiz_duel/services/socket_service.dart';
 
 class HomeScreen extends StatefulWidget {
   final List<int> genres;
-  // userData contains: _id, name, email, level, genres, stats: {wins, losses, etc}
   final Map<String, dynamic> userData;
 
   const HomeScreen({super.key, required this.genres, required this.userData});
@@ -13,71 +12,75 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  late List<int> currentGenres; // ADD
-  late Map<String, dynamic> currentUserData; // ADD
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin {
+  late List<int> currentGenres;
+  late Map<String, dynamic> currentUserData;
+  late AnimationController _entryCtrl;
+
   @override
   void initState() {
     super.initState();
     currentGenres = widget.genres;
     currentUserData = widget.userData;
-    _listenForStatsUpdate(); // Listen for real-time stats updates
+
+    _entryCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    )..forward();
+
+    _listenForStatsUpdate();
   }
 
   void _listenForStatsUpdate() {
     SocketService.instance.socket?.on('stats_update', (data) {
-      if (mounted) {
-        setState(() {
-          final updatedStats = {
-            ...((currentUserData['stats'] as Map?) ?? {}),
-            'totalPoints':
-                data['points'] ?? currentUserData['stats']?['totalPoints'] ?? 0,
-            'matchesPlayed':
-                data['matchesPlayed'] ??
-                currentUserData['stats']?['matchesPlayed'] ??
-                0,
-            'wins': data['wins'] ?? currentUserData['stats']?['wins'] ?? 0,
-            'losses':
-                data['losses'] ?? currentUserData['stats']?['losses'] ?? 0,
-            'draws': data['draws'] ?? currentUserData['stats']?['draws'] ?? 0,
-          };
-          currentUserData = {
-            ...currentUserData,
-            'stats': updatedStats,
-            'level': data['tier'] ?? currentUserData['level'],
-          };
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        final updatedStats = {
+          ...((currentUserData['stats'] as Map?) ?? {}),
+          'totalPoints':
+              data['points'] ?? currentUserData['stats']?['totalPoints'] ?? 0,
+          'matchesPlayed':
+              data['matchesPlayed'] ??
+              currentUserData['stats']?['matchesPlayed'] ??
+              0,
+          'wins': data['wins'] ?? currentUserData['stats']?['wins'] ?? 0,
+          'losses': data['losses'] ?? currentUserData['stats']?['losses'] ?? 0,
+          'draws': data['draws'] ?? currentUserData['stats']?['draws'] ?? 0,
+        };
+        currentUserData = {
+          ...currentUserData,
+          'stats': updatedStats,
+          'level': data['tier'] ?? currentUserData['level'],
+        };
+      });
     });
   }
 
   @override
   void dispose() {
     SocketService.instance.socket?.off('stats_update');
+    _entryCtrl.dispose();
     super.dispose();
-  }
-
-  void _navigateTo(BuildContext context, String route, Object? args) {
-    Navigator.pushNamed(context, route, arguments: args);
   }
 
   @override
   Widget build(BuildContext context) {
-    // Extracting stats from userData or providing defaults
-    final String username =
+    final username =
         currentUserData['username'] ?? currentUserData['name'] ?? 'Player';
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
         title: const Text(
-          "Quiz Arena",
+          'Quiz Arena',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         elevation: 0,
         backgroundColor: const Color(0xFF1E88E5),
         automaticallyImplyLeading: false,
         leading: const Padding(
-          padding: EdgeInsets.all(8.0),
+          padding: EdgeInsets.all(8),
           child: Logo(size: 70),
         ),
         actions: [
@@ -118,21 +121,29 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       body: Padding(
-        padding: const EdgeInsets.all(20.0),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              "Welcome back, $username!",
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
+            FadeTransition(
+              opacity: _entryCtrl,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Welcome back, $username!',
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const Text(
+                    'Ready to challenge someone?',
+                    style: TextStyle(fontSize: 16, color: Colors.grey),
+                  ),
+                ],
               ),
-            ),
-            const Text(
-              "Ready to challenge someone?",
-              style: TextStyle(fontSize: 16, color: Colors.grey),
             ),
             const SizedBox(height: 25),
             Expanded(
@@ -141,52 +152,60 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisSpacing: 16,
                 mainAxisSpacing: 16,
                 children: [
-                  _buildModeCard(
-                    context,
-                    "Quick Match",
-                    "Find Opponent",
+                  _modeCard(
+                    'Quick Match',
+                    'Find Opponent',
                     Icons.flash_on,
                     const Color(0xFF1E88E5),
-                    () => _navigateTo(context, '/loadingscreen', {
-                      'userId': currentUserData['_id'],
-                      'genres': currentGenres,
-                      'userData': currentUserData,
-                    }),
+                    0,
+                    () => Navigator.pushNamed(
+                      context,
+                      '/loadingscreen',
+                      arguments: {
+                        'userId': currentUserData['_id'],
+                        'genres': currentGenres,
+                        'userData': currentUserData,
+                      },
+                    ),
                   ),
-                  _buildModeCard(
-                    context,
-                    "Challenge",
-                    "Play Friends",
+                  _modeCard(
+                    'Challenge',
+                    'Play Friends',
                     Icons.group,
                     Colors.orange,
-                    () => _navigateTo(context, '/challenge', {
-                      'userId': widget.userData['_id'],
-                      'genres': widget.genres,
-                      'userData': widget.userData,
-                    }),
+                    1,
+                    () => Navigator.pushNamed(
+                      context,
+                      '/challenge',
+                      arguments: {...currentUserData, 'genres': currentGenres},
+                    ),
                   ),
-                  _buildModeCard(
-                    context,
-                    "Practice",
-                    "Solo Play",
+                  _modeCard(
+                    'Practice',
+                    'Solo Play',
                     Icons.school,
                     Colors.purple,
-                    () => _navigateTo(context, '/practice', {
-                      'genres': currentGenres,
-                      'userData': currentUserData,
-                    }),
+                    2,
+                    () => Navigator.pushNamed(
+                      context,
+                      '/practice',
+                      arguments: {
+                        'genres': currentGenres,
+                        'userData': currentUserData,
+                      },
+                    ),
                   ),
-                  _buildModeCard(
-                    context,
-                    "Leaderboard",
-                    "Top Players",
+                  _modeCard(
+                    'Leaderboard',
+                    'Top Players',
                     Icons.leaderboard,
                     Colors.green,
+                    3,
                     () => Navigator.pushNamed(
                       context,
                       '/leaderboard',
                       arguments: {'userId': currentUserData['_id'] ?? ''},
-                    ), // To be implemented
+                    ),
                   ),
                 ],
               ),
@@ -197,54 +216,123 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildModeCard(
-    BuildContext context,
+  Widget _modeCard(
     String title,
     String subtitle,
     IconData icon,
     Color color,
+    int index,
     VoidCallback onTap,
   ) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
+    final start = index * 0.12;
+    final end = (start + 0.5).clamp(0.0, 1.0);
+    final anim = CurvedAnimation(
+      parent: _entryCtrl,
+      curve: Interval(start, end, curve: Curves.easeOut),
+    );
+
+    return FadeTransition(
+      opacity: anim,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, 0.2),
+          end: Offset.zero,
+        ).animate(anim),
+        child: _PressCard(
+          color: color,
+          onTap: onTap,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 32, color: color),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              ),
+            ],
+          ),
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                shape: BoxShape.circle,
+      ),
+    );
+  }
+}
+
+class _PressCard extends StatefulWidget {
+  final Widget child;
+  final Color color;
+  final VoidCallback onTap;
+  const _PressCard({
+    required this.child,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  State<_PressCard> createState() => _PressCardState();
+}
+
+class _PressCardState extends State<_PressCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 100),
+      lowerBound: 0.94,
+      upperBound: 1.0,
+    )..value = 1.0;
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => _ctrl.reverse(),
+      onTapUp: (_) {
+        _ctrl.forward();
+        widget.onTap();
+      },
+      onTapCancel: () => _ctrl.forward(),
+      child: ScaleTransition(
+        scale: _ctrl,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: widget.color.withOpacity(0.12),
+                blurRadius: 14,
+                offset: const Offset(0, 5),
               ),
-              child: Icon(icon, size: 32, color: color),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-            ),
-          ],
+            ],
+          ),
+          child: widget.child,
         ),
       ),
     );

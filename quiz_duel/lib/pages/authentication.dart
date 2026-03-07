@@ -4,6 +4,7 @@ import 'package:quiz_duel/widgets/buttons.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:quiz_duel/services/constants.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -12,34 +13,61 @@ class AuthScreen extends StatefulWidget {
   State<AuthScreen> createState() => _AuthScreenState();
 }
 
-class _AuthScreenState extends State<AuthScreen> {
+class _AuthScreenState extends State<AuthScreen>
+    with SingleTickerProviderStateMixin {
   bool _isHidden = true;
   bool _isLoading = false;
 
-  final TextEditingController _loginEmailController = TextEditingController();
-  final TextEditingController _loginPasswordController =
-      TextEditingController();
+  final _loginUserCtrl = TextEditingController();
+  final _loginPassCtrl = TextEditingController();
+  final _regUserCtrl = TextEditingController();
+  final _regEmailCtrl = TextEditingController();
+  final _regPassCtrl = TextEditingController();
 
-  final TextEditingController _regUsernameController = TextEditingController();
-  final TextEditingController _regEmailController = TextEditingController();
-  final TextEditingController _regPasswordController = TextEditingController();
+  late AnimationController _entryCtrl;
+  late Animation<double> _fade;
+  late Animation<Offset> _slide;
 
-  // 🔹 Use your active backend IP (Synced with main.dart)
-  static const String baseUrl = "https://quiz-royale-ash0.onrender.com";
+  @override
+  void initState() {
+    super.initState();
+    _entryCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+    _fade = CurvedAnimation(parent: _entryCtrl, curve: Curves.easeIn);
+    _slide = Tween<Offset>(
+      begin: const Offset(0, 0.1),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _entryCtrl, curve: Curves.easeOut));
+    _entryCtrl.forward();
+  }
+
+  @override
+  void dispose() {
+    _entryCtrl.dispose();
+    _loginUserCtrl.dispose();
+    _loginPassCtrl.dispose();
+    _regUserCtrl.dispose();
+    _regEmailCtrl.dispose();
+    _regPassCtrl.dispose();
+    super.dispose();
+  }
+
   Future<void> _handleAuth(bool isLogin) async {
     setState(() => _isLoading = true);
-
-    final url = isLogin ? '$baseUrl/api/login' : '$baseUrl/api/register';
-
+    final url = isLogin
+        ? '${AppConstants.apiUrl}/login'
+        : '${AppConstants.apiUrl}/register';
     final body = isLogin
         ? {
-            'username': _loginEmailController.text.trim(),
-            'password': _loginPasswordController.text,
+            'username': _loginUserCtrl.text.trim(),
+            'password': _loginPassCtrl.text,
           }
         : {
-            'username': _regUsernameController.text.trim(),
-            'email': _regEmailController.text.trim(),
-            'password': _regPasswordController.text,
+            'username': _regUserCtrl.text.trim(),
+            'email': _regEmailCtrl.text.trim(),
+            'password': _regPassCtrl.text,
           };
 
     try {
@@ -49,49 +77,33 @@ class _AuthScreenState extends State<AuthScreen> {
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode(body),
           )
-          .timeout(
-            const Duration(seconds: 30),
-            onTimeout: () {
-              throw Exception('Request timed out. Please try again.');
-            },
-          );
-
-      print('AUTH: Response status ${response.statusCode}');
-      print('AUTH: Response body ${response.body}');
+          .timeout(const Duration(seconds: 30));
 
       final data = jsonDecode(response.body);
 
       if ((response.statusCode == 200 || response.statusCode == 201) &&
           data['user'] != null) {
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('userId', data['user']['_id'].toString());
-
+        await prefs.setString('userId', data['user']['_id']);
         if (!mounted) return;
-
-        final genres = List<int>.from(data['user']['genres'] ?? []);
-        final bool needsGenreSetup = genres.every((g) => g == 0);
-
         Navigator.pushReplacementNamed(
           context,
-          needsGenreSetup ? '/genre' : '/home',
+          isLogin ? '/home' : '/genre',
           arguments: data['user'],
         );
       } else {
         _showError(data['message'] ?? 'Authentication failed');
       }
     } catch (e) {
-      print('AUTH ERROR: $e');
       _showError('Connection error. Please check your internet and try again.');
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  void _showError(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
-  }
+  void _showError(String msg) => ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -108,37 +120,55 @@ class _AuthScreenState extends State<AuthScreen> {
         ),
         child: Center(
           child: SingleChildScrollView(
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 24),
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: DefaultTabController(
-                length: 2,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Logo(size: 100),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Quiz Royale',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
+            child: FadeTransition(
+              opacity: _fade,
+              child: SlideTransition(
+                position: _slide,
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 24),
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.15),
+                        blurRadius: 24,
+                        offset: const Offset(0, 8),
                       ),
+                    ],
+                  ),
+                  child: DefaultTabController(
+                    length: 2,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Logo(size: 100),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Quiz Royale',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Challenge. Compete. Conquer.',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                        const SizedBox(height: 24),
+                        _buildTabHeader(),
+                        const SizedBox(height: 20),
+                        SizedBox(
+                          height: 320,
+                          child: TabBarView(
+                            children: [_buildLogin(), _buildRegister()],
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 30),
-                    _buildTabHeader(),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      height: 320,
-                      child: TabBarView(
-                        children: [_buildLogin(), _buildRegister()],
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -175,10 +205,10 @@ class _AuthScreenState extends State<AuthScreen> {
   Widget _buildLogin() {
     return Column(
       children: [
-        _buildTextField(_loginEmailController, 'Username', Icons.person),
+        _buildTextField(_loginUserCtrl, 'Username', Icons.person),
         const SizedBox(height: 16),
         _buildTextField(
-          _loginPasswordController,
+          _loginPassCtrl,
           'Password',
           Icons.lock,
           isPassword: true,
@@ -187,7 +217,7 @@ class _AuthScreenState extends State<AuthScreen> {
         _isLoading
             ? const CircularProgressIndicator()
             : AppButton(
-                text: "Login",
+                text: 'Login',
                 onPressed: () => _handleAuth(true),
                 fontSize: 22,
               ),
@@ -198,21 +228,16 @@ class _AuthScreenState extends State<AuthScreen> {
   Widget _buildRegister() {
     return Column(
       children: [
-        _buildTextField(_regUsernameController, 'Username', Icons.person),
-        const SizedBox(height: 16),
-        _buildTextField(_regEmailController, 'Email', Icons.email_outlined),
-        const SizedBox(height: 16),
-        _buildTextField(
-          _regPasswordController,
-          'Password',
-          Icons.lock,
-          isPassword: true,
-        ),
-        const SizedBox(height: 24),
+        _buildTextField(_regUserCtrl, 'Username', Icons.person),
+        const SizedBox(height: 12),
+        _buildTextField(_regEmailCtrl, 'Email', Icons.email_outlined),
+        const SizedBox(height: 12),
+        _buildTextField(_regPassCtrl, 'Password', Icons.lock, isPassword: true),
+        const SizedBox(height: 20),
         _isLoading
             ? const CircularProgressIndicator()
             : AppButton(
-                text: "Register",
+                text: 'Register',
                 onPressed: () => _handleAuth(false),
                 fontSize: 22,
               ),
@@ -221,21 +246,25 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Widget _buildTextField(
-    TextEditingController controller,
+    TextEditingController ctrl,
     String label,
     IconData icon, {
     bool isPassword = false,
   }) {
     return TextField(
-      controller: controller,
+      controller: ctrl,
       obscureText: isPassword ? _isHidden : false,
       decoration: InputDecoration(
         filled: true,
-        fillColor: Colors.grey.shade200,
+        fillColor: Colors.grey.shade100,
         labelText: label,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Color(0xFF1E88E5), width: 2),
         ),
         prefixIcon: Icon(icon, color: Colors.black45),
         suffixIcon: isPassword

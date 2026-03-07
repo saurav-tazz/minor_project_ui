@@ -13,8 +13,8 @@ class AppButton extends StatelessWidget {
     super.key,
     required this.text,
     required this.onPressed,
-    this.color = const Color(0xFF42A5F5),   // default color
-    this.radius = 16,// default radius
+    this.color = const Color(0xFF42A5F5), // default color
+    this.radius = 16, // default radius
     this.fontSize = 16,
     this.width = double.infinity,
     this.height = 50,
@@ -33,7 +33,11 @@ class AppButton extends StatelessWidget {
       onPressed: onPressed,
       child: Text(
         text,
-        style: TextStyle(color: Colors.white,fontSize: fontSize, fontWeight: FontWeight.bold),
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: fontSize,
+          fontWeight: FontWeight.bold,
+        ),
       ),
     );
   }

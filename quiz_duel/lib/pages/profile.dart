@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:quiz_duel/services/constants.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String userId;
   final String username;
-  final String tier; // "Noob", "Intermediate", "Pro"
+  final String tier;
   final int points;
   final int matchesPlayed;
   final int wins;
   final int draws;
   final int losses;
   final List<int> genres;
-  final dynamic socket; // Passed from navigation for real-time updates
+  final dynamic socket;
 
   const ProfileScreen({
     super.key,
@@ -32,15 +33,19 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
-  // Use local variables to allow the UI to react to Socket events
-  late int currentPoints;
+class _ProfileScreenState extends State<ProfileScreen>
+    with SingleTickerProviderStateMixin {
+  late int currentPoints,
+      currentMatchesPlayed,
+      currentWins,
+      currentDraws,
+      currentLosses;
   late String currentTier;
-  late int currentMatchesPlayed;
-  late int currentWins;
-  late int currentDraws;
-  late int currentLosses;
-  final Map<int, String> genreLabels = const {
+  late List<int> selectedGenres;
+
+  late AnimationController _entryCtrl;
+
+  static const Map<int, String> genreLabels = {
     0: 'Society & Culture',
     1: 'Science & Mathematics',
     2: 'Health',
@@ -52,40 +57,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
     8: 'Family & Relationships',
     9: 'Politics & Government',
   };
-  late List<int> selectedGenres;
 
   @override
   void initState() {
     super.initState();
-    _initializeStats();
-    _fetchLatestStats(); // ADD
-    selectedGenres = List.from(widget.genres); // local copy for editing
+    _initStats();
+    selectedGenres = List.from(widget.genres);
 
-    // 🔹 LISTENER: Handle Real-time Stats Updates from the Server
-    widget.socket.on('stats_update', (data) {
-      if (mounted) {
-        setState(() {
-          currentPoints = data['points'] ?? currentPoints;
-          currentTier = data['tier'] ?? currentTier;
-          currentMatchesPlayed = data['matchesPlayed'] ?? currentMatchesPlayed;
-          currentWins = data['wins'] ?? currentWins;
-          currentDraws = data['draws'] ?? currentDraws;
-          currentLosses = data['losses'] ?? currentLosses;
-        });
+    _entryCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    )..forward();
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Stats updated! ⚡"),
-            duration: Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-            margin: EdgeInsets.all(15),
-          ),
-        );
-      }
+    _fetchLatestStats();
+
+    widget.socket?.on('stats_update', (data) {
+      if (!mounted) return;
+      setState(() {
+        currentPoints = data['points'] ?? currentPoints;
+        currentTier = data['tier'] ?? currentTier;
+        currentMatchesPlayed = data['matchesPlayed'] ?? currentMatchesPlayed;
+        currentWins = data['wins'] ?? currentWins;
+        currentDraws = data['draws'] ?? currentDraws;
+        currentLosses = data['losses'] ?? currentLosses;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Stats updated! ⚡'),
+          duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          margin: EdgeInsets.all(15),
+        ),
+      );
     });
   }
 
-  void _initializeStats() {
+  void _initStats() {
     currentPoints = widget.points;
     currentTier = widget.tier;
     currentMatchesPlayed = widget.matchesPlayed;
@@ -96,17 +103,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _fetchLatestStats() async {
     try {
-      final response = await http.get(
-        Uri.parse(
-          'https://quiz-royale-ash0.onrender.com/api/users/${widget.userId}',
-        ),
+      final res = await http.get(
+        Uri.parse('${AppConstants.apiUrl}/users/${widget.userId}'),
       );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
         final user = data['user'];
         final stats = user['stats'] ?? {};
-
         if (mounted) {
           setState(() {
             currentPoints = stats['totalPoints'] ?? currentPoints;
@@ -119,39 +122,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
           });
         }
       }
-    } catch (e) {
-      // silently fail, existing stats remain shown
-      print('Failed to fetch latest stats: $e');
-    }
+    } catch (_) {}
   }
 
   @override
   void dispose() {
-    widget.socket.off('stats_update');
+    widget.socket?.off('stats_update');
+    _entryCtrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final double winRate = currentMatchesPlayed > 0
+    final winRate = currentMatchesPlayed > 0
         ? (currentWins / currentMatchesPlayed * 100)
-        : 0;
+        : 0.0;
 
     return WillPopScope(
       onWillPop: () async {
-        Navigator.pop(context, selectedGenres); // Pass back updated genres
-        return false; // Prevent default pop since we handle it
+        Navigator.pop(context, selectedGenres);
+        return false;
       },
       child: Scaffold(
         backgroundColor: const Color(0xFFF5F7FA),
         body: CustomScrollView(
           slivers: [
-            // 🔹 Stylish Header with Back Button
             SliverAppBar(
               expandedHeight: 220,
               pinned: true,
               elevation: 0,
               backgroundColor: const Color(0xFF1E88E5),
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+                onPressed: () => Navigator.pop(context, selectedGenres),
+              ),
               flexibleSpace: FlexibleSpaceBar(
                 background: Container(
                   decoration: const BoxDecoration(
@@ -188,10 +192,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
               ),
-              leading: IconButton(
-                onPressed: () => Navigator.pop(context, selectedGenres),
-                icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
-              ),
             ),
 
             SliverToBoxAdapter(
@@ -200,36 +200,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 🔹 Win/Loss/Draw Summary Row
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 10,
-                            offset: const Offset(0, 5),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          _buildStatBox("Wins", currentWins, Colors.green),
-                          _buildVerticalDivider(),
-                          _buildStatBox("Draws", currentDraws, Colors.orange),
-                          _buildVerticalDivider(),
-                          _buildStatBox("Losses", currentLosses, Colors.red),
-                        ],
+                    // Win / Draw / Loss row
+                    FadeTransition(
+                      opacity: _entryCtrl,
+                      child: Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, 5),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            _statBox('Wins', currentWins, Colors.green),
+                            _vDivider(),
+                            _statBox('Draws', currentDraws, Colors.orange),
+                            _vDivider(),
+                            _statBox('Losses', currentLosses, Colors.red),
+                          ],
+                        ),
                       ),
                     ),
                     const SizedBox(height: 25),
 
-                    // 🔹 Core Stats Section
                     const Text(
-                      "PERFORMANCE",
+                      'PERFORMANCE',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
@@ -238,33 +240,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    _buildInfoCard(
+
+                    _infoCard(
                       icon: Icons.star_rounded,
-                      label: "Total Points",
+                      label: 'Total Points',
                       value: currentPoints.toString(),
                       color: Colors.amber,
                     ),
-                    _buildInfoCard(
+                    _infoCard(
                       icon: Icons.sports_esports_rounded,
-                      label: "Matches Played",
+                      label: 'Matches Played',
                       value: currentMatchesPlayed.toString(),
                       color: Colors.blueAccent,
                     ),
-                    _buildInfoCard(
+                    _infoCard(
                       icon: Icons.auto_graph_rounded,
-                      label: "Win Rate",
-                      value: "${winRate.toStringAsFixed(1)}%",
+                      label: 'Win Rate',
+                      value: '${winRate.toStringAsFixed(1)}%',
                       color: Colors.purpleAccent,
                     ),
 
                     const SizedBox(height: 25),
 
-                    // 🔹 Favorite Genres Section
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text(
-                          "FAVORITE GENRES",
+                          'FAVORITE GENRES',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
@@ -274,23 +276,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                         TextButton(
                           onPressed: _editGenres,
-                          child: const Text("Edit"),
+                          child: const Text('Edit'),
                         ),
                       ],
                     ),
                     const SizedBox(height: 8),
+
                     Wrap(
                       spacing: 10,
                       runSpacing: 10,
                       children: selectedGenres
                           .asMap()
                           .entries
-                          .where(
-                            (entry) => entry.value == 1,
-                          ) // only 1 = selected
-                          .map((entry) {
-                            final g = entry.key;
-                            final label = genreLabels[g] ?? "Unknown";
+                          .where((e) => e.value == 1)
+                          .map((e) {
+                            final label = genreLabels[e.key] ?? 'Unknown';
                             return Chip(
                               label: Text(label),
                               backgroundColor: Colors.white,
@@ -318,144 +318,130 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Future<void> _syncGenresWithServer(List<int> genres) async {
-    try {
-      final response = await http.post(
-        Uri.parse(
-          'https://quiz-royale-ash0.onrender.com/api/users/update-genres',
-        ),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'userId': widget.userId, 'preferredGenres': genres}),
-      );
-
-      if (response.statusCode == 200) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Genres updated successfully ✅"),
-              duration: Duration(seconds: 2),
-              behavior: SnackBarBehavior.floating,
-              margin: EdgeInsets.all(15),
-            ),
-          );
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Failed to update genres ❌")),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("Error: ${e.toString()}")));
-      }
-    }
-  }
-
+  // ── Genre edit dialog ──────────────────────────────────────
   void _editGenres() async {
-    final List<int> allGenres = genreLabels.keys.toList();
-
-    // Convert binary array to selected indexes
     final Set<int> selected = selectedGenres
         .asMap()
         .entries
-        .where((entry) => entry.value == 1)
-        .map((entry) => entry.key)
+        .where((e) => e.value == 1)
+        .map((e) => e.key)
         .toSet();
 
     final result = await showDialog<List<int>>(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text("Edit Favorite Genres"),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: StatefulBuilder(
-              builder: (context, setStateDialog) {
-                return ListView(
-                  shrinkWrap: true,
-                  children: allGenres.map((g) {
-                    return CheckboxListTile(
+      builder: (ctx) => AlertDialog(
+        title: const Text('Edit Favorite Genres'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: StatefulBuilder(
+            builder: (ctx, setS) => ListView(
+              shrinkWrap: true,
+              children: genreLabels.keys
+                  .map(
+                    (g) => CheckboxListTile(
                       title: Text(genreLabels[g]!),
                       value: selected.contains(g),
-                      onChanged: (val) {
-                        setStateDialog(() {
-                          if (val == true) {
-                            selected.add(g);
-                          } else {
-                            selected.remove(g);
-                          }
-                        });
-                      },
-                    );
-                  }).toList(),
-                );
-              },
+                      onChanged: (val) => setS(
+                        () => val! ? selected.add(g) : selected.remove(g),
+                      ),
+                    ),
+                  )
+                  .toList(),
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Cancel"),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, selected.toList()),
-              child: const Text("Save"),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (result != null) {
-      // Convert selected indexes BACK to binary array
-      final List<int> updatedBinary = List.filled(10, 0);
-      for (var g in result) {
-        updatedBinary[g] = 1;
-      }
-
-      setState(() {
-        selectedGenres = updatedBinary;
-      });
-
-      await _syncGenresWithServer(updatedBinary);
-    }
-  }
-
-  Widget _tierBadge(String tier) {
-    return Container(
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.black26,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.bolt, color: Colors.orangeAccent, size: 16),
-          const SizedBox(width: 4),
-          Text(
-            tier.toUpperCase(),
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-            ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, selected.toList()),
+            child: const Text('Save'),
           ),
         ],
       ),
     );
+
+    if (result != null) {
+      final binary = List.filled(10, 0);
+      for (var g in result) {
+        binary[g] = 1;
+      }
+      setState(() => selectedGenres = binary);
+      await _syncGenres(binary);
+    }
   }
 
-  Widget _buildVerticalDivider() {
-    return Container(height: 30, width: 1, color: Colors.grey.withOpacity(0.2));
+  Future<void> _syncGenres(List<int> genres) async {
+    try {
+      final res = await http.post(
+        Uri.parse('${AppConstants.apiUrl}/users/update-genres'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'userId': widget.userId, 'preferredGenres': genres}),
+      );
+      if (res.statusCode == 200 && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Genres updated ✅'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (_) {}
   }
 
-  Widget _buildInfoCard({
+  // ── Helper widgets ─────────────────────────────────────────
+  Widget _tierBadge(String tier) => Container(
+    margin: const EdgeInsets.only(top: 8),
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+    decoration: BoxDecoration(
+      color: Colors.black26,
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.bolt, color: Colors.orangeAccent, size: 16),
+        const SizedBox(width: 4),
+        Text(
+          tier.toUpperCase(),
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    ),
+  );
+
+  Widget _vDivider() =>
+      Container(height: 30, width: 1, color: Colors.grey.withOpacity(0.2));
+
+  Widget _statBox(String label, int value, Color color) => Column(
+    children: [
+      Text(
+        value.toString(),
+        style: TextStyle(
+          fontSize: 22,
+          fontWeight: FontWeight.bold,
+          color: color,
+        ),
+      ),
+      const SizedBox(height: 2),
+      Text(
+        label,
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          color: Colors.grey,
+        ),
+      ),
+    ],
+  );
+
+  Widget _infoCard({
     required IconData icon,
     required String label,
     required String value,
@@ -502,30 +488,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildStatBox(String label, int value, Color color) {
-    return Column(
-      children: [
-        Text(
-          value.toString(),
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-            color: Colors.grey,
-          ),
-        ),
-      ],
     );
   }
 }

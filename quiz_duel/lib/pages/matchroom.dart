@@ -36,12 +36,10 @@ class _MatchRoomScreenState extends State<MatchRoomScreen> {
     super.initState();
     _startQuestionTimer();
 
-    // game_over handles ALL navigation
     widget.socket.on('game_over', (data) {
       if (mounted) {
-        _timer?.cancel();
         final args = Map<String, dynamic>.from(data);
-        args['myId'] = widget.userId;
+        args['myId'] = widget.userId; // so ResultScreen knows who "me" is
         args['userData'] = widget.userData;
         Navigator.pushReplacementNamed(
           context,
@@ -51,28 +49,47 @@ class _MatchRoomScreenState extends State<MatchRoomScreen> {
       }
     });
 
-    // Just show snackbar — game_over will navigate
     widget.socket.on('opponent_left', (data) {
       if (mounted) {
+        _timer?.cancel();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Opponent disconnected. You win!'),
             backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
+            duration: Duration(seconds: 3),
           ),
         );
+        Future.delayed(const Duration(seconds: 3), () {
+          if (mounted) {
+            Navigator.pushReplacementNamed(
+              context,
+              '/home',
+              arguments: widget.userData,
+            );
+          }
+        });
       }
     });
 
     widget.socket.on('opponent_forfeited', (data) {
       if (mounted) {
+        _timer?.cancel();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Opponent forfeited. You win!'),
             backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
+            duration: Duration(seconds: 3),
           ),
         );
+        Future.delayed(const Duration(seconds: 3), () {
+          if (mounted) {
+            Navigator.pushReplacementNamed(
+              context,
+              '/home',
+              arguments: widget.userData,
+            );
+          }
+        });
       }
     });
   }
@@ -247,23 +264,13 @@ class _MatchRoomScreenState extends State<MatchRoomScreen> {
               ),
               TextButton(
                 onPressed: () => Navigator.pop(context, true),
-                child: const Text('Leave', style: TextStyle(color: Colors.red)),
+                child: const Text('Leave'),
               ),
             ],
           ),
         );
 
         if (shouldLeave == true) {
-          // Submit whatever score accumulated so far before forfeiting
-          widget.socket.emit('submit_score', {
-            'roomId': widget.roomId,
-            'userId': widget.userId,
-            'score': {'correct': correctCount, 'wrong': wrongCount},
-          });
-
-          // Small delay so submit_score reaches server before forfeit
-          await Future.delayed(const Duration(milliseconds: 300));
-
           widget.socket.emit('forfeit', {
             'userId': widget.userId,
             'roomId': widget.roomId,
@@ -325,7 +332,6 @@ class _MatchRoomScreenState extends State<MatchRoomScreen> {
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
-                              fontSize: 24,
                             ),
                           ),
                         ),
@@ -405,12 +411,9 @@ class _MatchRoomScreenState extends State<MatchRoomScreen> {
                             onPressed: () => _handleAnswer(i),
                             child: Align(
                               alignment: Alignment.centerLeft,
-                              child: Padding(
-                                padding: const EdgeInsets.only(left: 8.0),
-                                child: Text(
-                                  "${String.fromCharCode(65 + i)}. ${question['options'][i]}",
-                                  style: const TextStyle(fontSize: 16),
-                                ),
+                              child: Text(
+                                "${String.fromCharCode(65 + i)}. ${question['options'][i]}",
+                                style: const TextStyle(fontSize: 16),
                               ),
                             ),
                           ),

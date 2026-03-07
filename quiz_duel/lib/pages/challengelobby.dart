@@ -1,13 +1,33 @@
-// challenge_lobby.dart
-// Entry screen for Challenge mode — user picks Create or Join
 import 'package:flutter/material.dart';
 import 'package:quiz_duel/pages/challengescreen.dart';
 import 'package:quiz_duel/pages/joinroomscreen.dart';
 
-class ChallengeLobbyScreen extends StatelessWidget {
+class ChallengeLobbyScreen extends StatefulWidget {
   final Map<String, dynamic> userData;
-
   const ChallengeLobbyScreen({super.key, required this.userData});
+
+  @override
+  State<ChallengeLobbyScreen> createState() => _ChallengeLobbyScreenState();
+}
+
+class _ChallengeLobbyScreenState extends State<ChallengeLobbyScreen>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    )..forward();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -63,57 +83,64 @@ class ChallengeLobbyScreen extends StatelessWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Text(
-                          'Play with Friends',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Create a room and share the code,\nor join a friend\'s room.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Colors.grey,
-                            fontSize: 14,
-                            height: 1.5,
+                        FadeTransition(
+                          opacity: _ctrl,
+                          child: const Column(
+                            children: [
+                              Text(
+                                'Play with Friends',
+                                style: TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                'Create a room and share the code,\nor join a friend\'s room.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 14,
+                                  height: 1.5,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
 
                         const SizedBox(height: 48),
 
-                        // Create Room card
-                        _buildOptionCard(
-                          context,
+                        _OptionCard(
                           icon: Icons.add_circle_outline_rounded,
                           title: 'Create Room',
                           subtitle: 'Generate a code and wait for a friend',
                           color: const Color(0xFF1E88E5),
+                          delay: 0.1,
+                          ctrl: _ctrl,
                           onTap: () => Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (_) =>
-                                  ChallengeScreen(userData: userData),
+                                  ChallengeScreen(userData: widget.userData),
                             ),
                           ),
                         ),
 
                         const SizedBox(height: 16),
 
-                        // Join Room card
-                        _buildOptionCard(
-                          context,
+                        _OptionCard(
                           icon: Icons.login_rounded,
                           title: 'Join Room',
                           subtitle: 'Enter a friend\'s 6-character code',
                           color: Colors.orange,
+                          delay: 0.25,
+                          ctrl: _ctrl,
                           onTap: () => Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (_) =>
-                                  JoinRoomScreen(userData: userData),
+                                  JoinRoomScreen(userData: widget.userData),
                             ),
                           ),
                         ),
@@ -128,68 +155,136 @@ class ChallengeLobbyScreen extends StatelessWidget {
       ),
     );
   }
+}
 
-  Widget _buildOptionCard(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(22),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(14),
+class _OptionCard extends StatefulWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final double delay;
+  final AnimationController ctrl;
+  final VoidCallback onTap;
+
+  const _OptionCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.delay,
+    required this.ctrl,
+    required this.onTap,
+  });
+
+  @override
+  State<_OptionCard> createState() => _OptionCardState();
+}
+
+class _OptionCardState extends State<_OptionCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _pressCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _pressCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 100),
+      lowerBound: 0.96,
+      upperBound: 1.0,
+    )..value = 1.0;
+  }
+
+  @override
+  void dispose() {
+    _pressCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final anim = CurvedAnimation(
+      parent: widget.ctrl,
+      curve: Interval(
+        widget.delay,
+        (widget.delay + 0.5).clamp(0.0, 1.0),
+        curve: Curves.easeOut,
+      ),
+    );
+
+    return FadeTransition(
+      opacity: anim,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, 0.15),
+          end: Offset.zero,
+        ).animate(anim),
+        child: GestureDetector(
+          onTapDown: (_) => _pressCtrl.reverse(),
+          onTapUp: (_) {
+            _pressCtrl.forward();
+            widget.onTap();
+          },
+          onTapCancel: () => _pressCtrl.forward(),
+          child: ScaleTransition(
+            scale: _pressCtrl,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(22),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                shape: BoxShape.circle,
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: widget.color.withOpacity(0.1),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-              child: Icon(icon, color: color, size: 30),
-            ),
-            const SizedBox(width: 18),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: widget.color.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(widget.icon, color: widget.color, size: 30),
+                  ),
+                  const SizedBox(width: 18),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.title,
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          widget.subtitle,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(fontSize: 13, color: Colors.grey),
+                  Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 16,
+                    color: Colors.grey.shade400,
                   ),
                 ],
               ),
             ),
-            Icon(
-              Icons.arrow_forward_ios_rounded,
-              size: 16,
-              color: Colors.grey.shade400,
-            ),
-          ],
+          ),
         ),
       ),
     );

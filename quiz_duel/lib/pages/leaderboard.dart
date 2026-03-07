@@ -1,24 +1,22 @@
-// leaderboard.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:quiz_duel/services/socket_service.dart';
 
 class LeaderboardScreen extends StatefulWidget {
   final String currentUserId;
-
   const LeaderboardScreen({super.key, required this.currentUserId});
 
   @override
   State<LeaderboardScreen> createState() => _LeaderboardScreenState();
 }
 
-class _LeaderboardScreenState extends State<LeaderboardScreen> {
+class _LeaderboardScreenState extends State<LeaderboardScreen>
+    with SingleTickerProviderStateMixin {
   List<Map<String, dynamic>> _leaderboard = [];
   bool _isLoading = true;
   bool _hasError = false;
 
-  // ── ADJUST THIS NUMBER to control how many players appear ──
-  static const int _leaderboardLimit = 50;
+  static const int _limit = 50;
 
   static const Map<String, Map<String, dynamic>> _tierConfig = {
     'noob': {'label': 'noob', 'color': Color(0xFF78909C), 'icon': Icons.bolt},
@@ -34,14 +32,20 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     },
   };
 
+  late AnimationController _listCtrl;
+
   @override
   void initState() {
     super.initState();
-    _setupSocketListeners();
+    _listCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _setupListeners();
     _requestLeaderboard();
   }
 
-  void _setupSocketListeners() {
+  void _setupListeners() {
     SocketService.instance.socket?.on('leaderboard_update', (data) {
       if (!mounted) return;
       final raw = data['leaderboard'] as List<dynamic>? ?? [];
@@ -52,9 +56,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         _isLoading = false;
         _hasError = false;
       });
+      _listCtrl.forward(from: 0);
     });
-
-    SocketService.instance.socket?.on('error', (data) {
+    SocketService.instance.socket?.on('error', (_) {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
@@ -68,10 +72,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       _isLoading = true;
       _hasError = false;
     });
-    SocketService.instance.socket?.emit('get_leaderboard', {
-      'limit': _leaderboardLimit,
-    });
-
+    SocketService.instance.socket?.emit('get_leaderboard', {'limit': _limit});
     Future.delayed(const Duration(seconds: 8), () {
       if (mounted && _isLoading) {
         setState(() {
@@ -86,10 +87,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
   void dispose() {
     SocketService.instance.socket?.off('leaderboard_update');
     SocketService.instance.socket?.off('error');
+    _listCtrl.dispose();
     super.dispose();
   }
-
-  // ── Rank widget — medal emoji for top 3, plain number for rest ──
 
   Widget _rankWidget(int rank) {
     if (rank == 1) return const Text('🥇', style: TextStyle(fontSize: 26));
@@ -104,8 +104,6 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       ),
     );
   }
-
-  // ── Build ──────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -128,16 +126,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              // App bar
               _buildAppBar(),
-
-              // "Your Rank" banner — only shown if user is in the list
               if (!_isLoading && !_hasError && myRank != null)
                 _buildMyRankBanner(myRank, myPoints),
-
               const SizedBox(height: 16),
-
-              // White rounded container holding the list
               Expanded(
                 child: Container(
                   decoration: const BoxDecoration(
@@ -161,8 +153,27 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                         : ListView.builder(
                             padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
                             itemCount: _leaderboard.length,
-                            itemBuilder: (context, index) =>
-                                _buildPlayerCard(_leaderboard[index]),
+                            itemBuilder: (_, i) {
+                              final delay = (i * 0.04).clamp(0.0, 0.8);
+                              final anim = CurvedAnimation(
+                                parent: _listCtrl,
+                                curve: Interval(
+                                  delay,
+                                  (delay + 0.4).clamp(0.0, 1.0),
+                                  curve: Curves.easeOut,
+                                ),
+                              );
+                              return FadeTransition(
+                                opacity: anim,
+                                child: SlideTransition(
+                                  position: Tween<Offset>(
+                                    begin: const Offset(0.05, 0),
+                                    end: Offset.zero,
+                                  ).animate(anim),
+                                  child: _buildPlayerCard(_leaderboard[i]),
+                                ),
+                              );
+                            },
                           ),
                   ),
                 ),
@@ -174,106 +185,95 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     );
   }
 
-  // ── App Bar ────────────────────────────────────────────────
+  Widget _buildAppBar() => Padding(
+    padding: const EdgeInsets.fromLTRB(4, 8, 16, 4),
+    child: Row(
+      children: [
+        IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new,
+            color: Colors.white,
+            size: 20,
+          ),
+          onPressed: () => Navigator.pop(context),
+        ),
+        const Icon(Icons.emoji_events, color: Colors.white, size: 26),
+        const SizedBox(width: 8),
+        const Text(
+          'Leaderboard',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const Spacer(),
+        IconButton(
+          icon: const Icon(
+            Icons.refresh_rounded,
+            color: Colors.white70,
+            size: 22,
+          ),
+          onPressed: _requestLeaderboard,
+        ),
+      ],
+    ),
+  );
 
-  Widget _buildAppBar() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 8, 16, 4),
-      child: Row(
-        children: [
-          IconButton(
-            icon: const Icon(
-              Icons.arrow_back_ios_new,
-              color: Colors.white,
-              size: 20,
+  Widget _buildMyRankBanner(int rank, dynamic points) => Container(
+    margin: const EdgeInsets.symmetric(horizontal: 16),
+    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+    decoration: BoxDecoration(
+      color: Colors.white.withOpacity(0.22),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: Colors.white.withOpacity(0.45), width: 1.5),
+    ),
+    child: Row(
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Your Rank',
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
             ),
-            onPressed: () => Navigator.pop(context),
-          ),
-          const Icon(Icons.emoji_events, color: Colors.white, size: 26),
-          const SizedBox(width: 8),
-          const Text(
-            'Leaderboard',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
+            const SizedBox(height: 2),
+            Text(
+              '#$rank',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 30,
+                fontWeight: FontWeight.w900,
+                height: 1,
+              ),
             ),
-          ),
-          const Spacer(),
-          IconButton(
-            icon: const Icon(
-              Icons.refresh_rounded,
-              color: Colors.white70,
-              size: 22,
+          ],
+        ),
+        const Spacer(),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              '$points',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.w900,
+              ),
             ),
-            onPressed: _requestLeaderboard,
-            tooltip: 'Refresh',
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── My Rank Banner ─────────────────────────────────────────
-
-  Widget _buildMyRankBanner(int rank, dynamic points) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.22),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.45), width: 1.5),
-      ),
-      child: Row(
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Your Rank',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                '#$rank',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 30,
-                  fontWeight: FontWeight.w900,
-                  height: 1,
-                ),
-              ),
-            ],
-          ),
-          const Spacer(),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '$points',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const Text(
-                'points',
-                style: TextStyle(color: Colors.white70, fontSize: 12),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Player Card ────────────────────────────────────────────
+            const Text(
+              'points',
+              style: TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
 
   Widget _buildPlayerCard(Map<String, dynamic> player) {
     final isMe = player['userId'].toString() == widget.currentUserId;
@@ -286,7 +286,6 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        // Gold tint for top 3, light blue for current user, white otherwise
         color: isMe
             ? const Color(0xFFE3F2FD)
             : isTopThree
@@ -313,12 +312,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(
           children: [
-            // Rank
             SizedBox(width: 36, child: Center(child: _rankWidget(rank))),
-
             const SizedBox(width: 12),
-
-            // Avatar
             CircleAvatar(
               radius: 24,
               backgroundColor: (tierConf['color'] as Color).withOpacity(0.15),
@@ -331,10 +326,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                 ),
               ),
             ),
-
             const SizedBox(width: 14),
-
-            // Name + tier + win rate
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -382,7 +374,6 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                   const SizedBox(height: 5),
                   Row(
                     children: [
-                      // Tier badge
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
@@ -425,8 +416,6 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                 ],
               ),
             ),
-
-            // Points
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -451,82 +440,71 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
   }
 }
 
-// ── Supporting state widgets ───────────────────────────────
-
 class _LoadingState extends StatelessWidget {
   const _LoadingState();
-
   @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          CircularProgressIndicator(color: Color(0xFF1E88E5)),
-          SizedBox(height: 20),
-          Text(
-            'Fetching rankings...',
-            style: TextStyle(color: Colors.black45, fontSize: 14),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => const Center(
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        CircularProgressIndicator(color: Color(0xFF1E88E5)),
+        SizedBox(height: 20),
+        Text(
+          'Fetching rankings...',
+          style: TextStyle(color: Colors.black45, fontSize: 14),
+        ),
+      ],
+    ),
+  );
 }
 
 class _ErrorState extends StatelessWidget {
   final VoidCallback onRetry;
   const _ErrorState({required this.onRetry});
-
   @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.wifi_off_rounded, color: Colors.black26, size: 56),
-          const SizedBox(height: 16),
-          const Text(
-            'Could not load leaderboard',
-            style: TextStyle(color: Colors.black45, fontSize: 16),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: onRetry,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Retry'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF1E88E5),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+  Widget build(BuildContext context) => Center(
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Icon(Icons.wifi_off_rounded, color: Colors.black26, size: 56),
+        const SizedBox(height: 16),
+        const Text(
+          'Could not load leaderboard',
+          style: TextStyle(color: Colors.black45, fontSize: 16),
+        ),
+        const SizedBox(height: 24),
+        ElevatedButton.icon(
+          onPressed: onRetry,
+          icon: const Icon(Icons.refresh),
+          label: const Text('Retry'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF1E88E5),
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
             ),
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
 }
 
 class _EmptyState extends StatelessWidget {
   const _EmptyState();
-
   @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text('🏆', style: TextStyle(fontSize: 56)),
-          SizedBox(height: 16),
-          Text(
-            'No players yet.\nBe the first to play!',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.black45, fontSize: 16, height: 1.6),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => const Center(
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text('🏆', style: TextStyle(fontSize: 56)),
+        SizedBox(height: 16),
+        Text(
+          'No players yet.\nBe the first to play!',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.black45, fontSize: 16, height: 1.6),
+        ),
+      ],
+    ),
+  );
 }
