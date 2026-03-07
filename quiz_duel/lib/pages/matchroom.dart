@@ -27,7 +27,7 @@ class _MatchRoomScreenState extends State<MatchRoomScreen> {
   int score = 0;
   int correctCount = 0;
   int wrongCount = 0;
-  int timeLeft = 10;
+  int timeLeft = 50;
   Timer? _timer;
   bool answered = false;
 
@@ -51,7 +51,6 @@ class _MatchRoomScreenState extends State<MatchRoomScreen> {
 
     widget.socket.on('opponent_left', (data) {
       if (mounted) {
-        _timer?.cancel();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Opponent disconnected. You win!'),
@@ -59,15 +58,6 @@ class _MatchRoomScreenState extends State<MatchRoomScreen> {
             duration: Duration(seconds: 3),
           ),
         );
-        Future.delayed(const Duration(seconds: 3), () {
-          if (mounted) {
-            Navigator.pushReplacementNamed(
-              context,
-              '/home',
-              arguments: widget.userData,
-            );
-          }
-        });
       }
     });
 
@@ -97,7 +87,7 @@ class _MatchRoomScreenState extends State<MatchRoomScreen> {
   void _startQuestionTimer() {
     _timer?.cancel();
     setState(() {
-      timeLeft = 10;
+      timeLeft = 50;
       answered = false;
     });
 
@@ -105,14 +95,18 @@ class _MatchRoomScreenState extends State<MatchRoomScreen> {
       if (timeLeft > 0) {
         setState(() => timeLeft--);
       } else {
-        _nextQuestion();
+        _timer?.cancel();
+        widget.socket.emit('submit_score', {
+          'roomId': widget.roomId,
+          'userId': widget.userId,
+          'score': {'correct': correctCount, 'wrong': wrongCount},
+        });
       }
     });
   }
 
   void _handleAnswer(int selectedIndex) {
     if (answered) return;
-    _timer?.cancel();
 
     final currentQuestion = widget.questions[currentIndex];
 
@@ -146,53 +140,16 @@ class _MatchRoomScreenState extends State<MatchRoomScreen> {
     if (currentIndex < widget.questions.length - 1) {
       setState(() {
         currentIndex++;
+        answered = false;
       });
-      _startQuestionTimer();
     } else {
       _timer?.cancel();
-
-      print(
-        "DEBUG: Sending Score - Correct: $correctCount, Wrong: $wrongCount",
-      );
-
       widget.socket.emit('submit_score', {
         'roomId': widget.roomId,
         'userId': widget.userId,
         'score': {'correct': correctCount, 'wrong': wrongCount},
       });
     }
-
-    // All questions done — send final score to backend- claude commented out for testing without socket connection
-    // widget.socket.emit('submit_score', {
-    //   'roomId': widget.roomId,
-    //   'userId': widget.userId,
-    //   'score': {'correct': correctCount, 'wrong': wrongCount},
-    // });
-    // Navigation now happens via the 'game_over' socket event in initState
-
-    // Future.delayed(const Duration(milliseconds: 500), () {
-    //   if (mounted) {
-    //     Navigator.pushReplacementNamed(
-    //       context,
-    //       '/resultscreen', // Matches your main.dart onGenerateRoute name
-    //       arguments: {
-    //         'results': [
-    //           {
-    //             'userId': widget.userId,
-    //             'name': 'You (Testing)',
-    //             'matchScore': score,
-    //           },
-    //           {
-    //             'userId': 'dummy_id',
-    //             'name': 'Opponent',
-    //             'matchScore': 30, // Dummy score for testing
-    //           },
-    //         ],
-    //         'winner': score > 30 ? widget.userId : 'dummy_id',
-    //       },
-    //     );
-    //   }
-    // });claude commented out for testing without socket connection
   }
 
   @override
@@ -329,29 +286,15 @@ class _MatchRoomScreenState extends State<MatchRoomScreen> {
                           ),
                           child: Text(
                             "${timeLeft}s",
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: timeLeft <= 10
+                                  ? Colors.red.shade300
+                                  : Colors.white,
                               fontWeight: FontWeight.bold,
+                              fontSize: 30,
                             ),
                           ),
                         ),
-
-                        /// Opponent Placeholder
-                        // Column(
-                        //   children: const [
-                        //     Text(
-                        //       "Opponent",
-                        //       style: TextStyle(color: Colors.white70),
-                        //     ),
-                        //     Text(
-                        //       "0 pts",
-                        //       style: TextStyle(
-                        //         color: Colors.white,
-                        //         fontWeight: FontWeight.bold,
-                        //       ),
-                        //     ),
-                        //   ],
-                        // ),
                       ],
                     ),
                   ),
@@ -397,12 +340,15 @@ class _MatchRoomScreenState extends State<MatchRoomScreen> {
                       itemCount: question['options'].length,
                       itemBuilder: (context, i) {
                         return Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.only(bottom: 12, left: 10),
                           child: ElevatedButton(
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.grey.shade200,
                               foregroundColor: Colors.black87,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 16,
+                                horizontal: 20,
+                              ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(15),
                               ),
