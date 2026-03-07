@@ -15,7 +15,7 @@ class MatchRoomScreen extends StatefulWidget {
     required this.userId,
     required this.questions,
     required this.socket,
-    this.userData = const {}, // Optional user data for later use
+    this.userData = const {},
   });
 
   @override
@@ -39,7 +39,7 @@ class _MatchRoomScreenState extends State<MatchRoomScreen> {
     widget.socket.on('game_over', (data) {
       if (mounted) {
         final args = Map<String, dynamic>.from(data);
-        args['myId'] = widget.userId; // so ResultScreen knows who "me" is
+        args['myId'] = widget.userId;
         args['userData'] = widget.userData;
         Navigator.pushReplacementNamed(
           context,
@@ -53,9 +53,11 @@ class _MatchRoomScreenState extends State<MatchRoomScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Opponent disconnected. You win!'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 3),
+            content: Text(
+              'Opponent disconnected. Finish your questions to see the result!',
+            ),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 4),
           ),
         );
       }
@@ -63,23 +65,15 @@ class _MatchRoomScreenState extends State<MatchRoomScreen> {
 
     widget.socket.on('opponent_forfeited', (data) {
       if (mounted) {
-        _timer?.cancel();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Opponent forfeited. You win!'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 3),
+            content: Text(
+              'Opponent forfeited. Finish your questions to see the result!',
+            ),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 4),
           ),
         );
-        Future.delayed(const Duration(seconds: 3), () {
-          if (mounted) {
-            Navigator.pushReplacementNamed(
-              context,
-              '/home',
-              arguments: widget.userData,
-            );
-          }
-        });
       }
     });
   }
@@ -125,14 +119,6 @@ class _MatchRoomScreenState extends State<MatchRoomScreen> {
 
     setState(() => answered = true);
 
-    // widget.socket.emit('submit_answer', {
-    //   'roomId': widget.roomId,
-    //   'userId': widget.userId,
-    //   'questionIndex': currentIndex,
-    //   'isCorrect': isCorrect,
-    //   'points': isCorrect ? 10 : 0,
-    // }); claude commented out for testing without socket connection
-
     Future.delayed(const Duration(milliseconds: 800), _nextQuestion);
   }
 
@@ -152,6 +138,12 @@ class _MatchRoomScreenState extends State<MatchRoomScreen> {
     }
   }
 
+  Color get _timerBarColor {
+    if (timeLeft > 30) return Colors.greenAccent;
+    if (timeLeft > 15) return Colors.orangeAccent;
+    return Colors.redAccent;
+  }
+
   @override
   void dispose() {
     _timer?.cancel();
@@ -163,7 +155,6 @@ class _MatchRoomScreenState extends State<MatchRoomScreen> {
 
   @override
   Widget build(BuildContext context) {
-    //TESTING: If no questions passed, show a simple screen with a button to jump to results (to test result screen without going through actual quiz flow)
     if (widget.questions.isEmpty) {
       return Scaffold(
         body: Center(
@@ -174,7 +165,6 @@ class _MatchRoomScreenState extends State<MatchRoomScreen> {
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: () {
-                  //MANUALLY JUMP TO RESULTS
                   Navigator.pushReplacementNamed(
                     context,
                     '/resultscreen',
@@ -183,15 +173,15 @@ class _MatchRoomScreenState extends State<MatchRoomScreen> {
                         {
                           'userId': 'test_user',
                           'name': 'You (Tester)',
-                          'matchScore': 80, // Dummy score
+                          'matchScore': 80,
                         },
                         {
                           'userId': 'bot_123',
                           'name': 'Opponent',
-                          'matchScore': 50, // Dummy score
+                          'matchScore': 50,
                         },
                       ],
-                      'winner': 'test_user', // Sets you as winner for testing
+                      'winner': 'test_user',
                     },
                   );
                 },
@@ -250,56 +240,49 @@ class _MatchRoomScreenState extends State<MatchRoomScreen> {
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  /// 🔹 Top Scoreboard
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        /// You
-                        // Column(
-                        //   children: [
-                        //     const Text(
-                        //       "You",
-                        //       style: TextStyle(color: Colors.white70),
-                        //     ),
-                        //     Text(
-                        //       "$score pts",
-                        //       style: const TextStyle(
-                        //         color: Colors.white,
-                        //         fontWeight: FontWeight.bold,
-                        //       ),
-                        //     ),
-                        //   ],
-                        // ),
-
-                        /// Timer Circle
-                        Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Text(
-                            "${timeLeft}s",
-                            style: TextStyle(
-                              color: timeLeft <= 10
-                                  ? Colors.red.shade300
-                                  : Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 30,
+                  /// 🔹 Timer Bar
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Question ${currentIndex + 1} of ${widget.questions.length}',
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
+                          Text(
+                            '${timeLeft}s',
+                            style: TextStyle(
+                              color: timeLeft <= 10
+                                  ? Colors.redAccent
+                                  : Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: LinearProgressIndicator(
+                          value: timeLeft / 50,
+                          minHeight: 12,
+                          backgroundColor: Colors.white24,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            _timerBarColor,
+                          ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
 
-                  const SizedBox(height: 25),
+                  const SizedBox(height: 20),
 
                   /// 🔹 Question Card
                   Container(
@@ -309,34 +292,23 @@ class _MatchRoomScreenState extends State<MatchRoomScreen> {
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "Question ${currentIndex + 1} of ${widget.questions.length}",
-                          style: const TextStyle(
-                            color: Colors.black54,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          question['questionText'],
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black,
-                          ),
-                        ),
-                      ],
+                    child: Text(
+                      question['questionText'],
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
                     ),
                   ),
 
                   const SizedBox(height: 20),
 
                   /// 🔹 Options
+                  /// 🔹 Options
                   Expanded(
                     child: ListView.builder(
+                      physics: const NeverScrollableScrollPhysics(),
                       itemCount: question['options'].length,
                       itemBuilder: (context, i) {
                         return Padding(
@@ -368,15 +340,20 @@ class _MatchRoomScreenState extends State<MatchRoomScreen> {
                     ),
                   ),
 
+                  const Spacer(),
+
                   /// 🔹 Bottom Progress Bar
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: LinearProgressIndicator(
-                      value: (currentIndex + 1) / widget.questions.length,
-                      minHeight: 8,
-                      backgroundColor: Colors.white24,
-                      valueColor: const AlwaysStoppedAnimation<Color>(
-                        Colors.black87,
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: LinearProgressIndicator(
+                        value: (currentIndex + 1) / widget.questions.length,
+                        minHeight: 8,
+                        backgroundColor: Colors.white24,
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          Colors.white,
+                        ),
                       ),
                     ),
                   ),
