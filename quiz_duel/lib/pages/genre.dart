@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:quiz_duel/services/constants.dart';
 
 class GenreScreen extends StatefulWidget {
   const GenreScreen({super.key});
@@ -53,9 +54,7 @@ class _GenreScreenState extends State<GenreScreen> {
       }
 
       final response = await http.post(
-        Uri.parse(
-          'https://quiz-royale-ash0.onrender.com/api/users/update-genres',
-        ),
+        Uri.parse('${AppConstants.apiUrl}/users/update-genres'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'userId': userId,
