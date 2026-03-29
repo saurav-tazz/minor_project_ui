@@ -26,7 +26,6 @@ class _ChallengeScreenState extends State<ChallengeScreen> {
   }
 
   void _setupSocketListeners() {
-    // Server confirmed room creation
     SocketService.instance.socket?.on('room_created', (data) {
       if (!mounted) return;
       setState(() {
@@ -36,7 +35,6 @@ class _ChallengeScreenState extends State<ChallengeScreen> {
       _startCountdown();
     });
 
-    // Friend joined — navigate to question selection
     SocketService.instance.socket?.on('start_selection', (data) {
       if (!mounted) return;
       _countdownTimer?.cancel();
@@ -93,8 +91,6 @@ class _ChallengeScreenState extends State<ChallengeScreen> {
   }
 
   void _createRoom() {
-    print("USER DATA: ${widget.userData}");
-    print("USER ID SENT: ${widget.userData['userId']}");
     SocketService.instance.socket?.emit('create_room', {
       'userId':
           widget.userData['_id']?.toString() ??

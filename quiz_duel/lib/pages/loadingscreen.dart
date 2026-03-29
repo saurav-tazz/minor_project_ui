@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-// import 'package:quiz_duel/pages/questionSelection.dart';
 import 'package:quiz_duel/services/socket_service.dart';
-// import 'package:quiz_duel/pages/homescreen.dart';
 
 class LoadingScreen extends StatefulWidget {
   final String userId;
@@ -17,7 +15,6 @@ class LoadingScreen extends StatefulWidget {
   });
 
   @override
-  // ignore: library_private_types_in_public_api
   _LoadingScreenState createState() => _LoadingScreenState();
 }
 

@@ -31,7 +31,7 @@ class _QuestionSelectionScreenState extends State<QuestionSelectionScreen> {
   List<String> selectedIds = [];
   late int timeLeft;
   Timer? _timer;
-  bool _isWaiting = false; // To show waiting state after submission
+  bool _isWaiting = false;
 
   @override
   void initState() {
@@ -39,16 +39,9 @@ class _QuestionSelectionScreenState extends State<QuestionSelectionScreen> {
     timeLeft = widget.timer;
     _startTimer();
 
-    // Listen for the server to confirm both players are ready to start the match
     widget.socket.on('start_duel', (data) {
       if (mounted) {
         _timer?.cancel();
-
-        // Debug — remove after confirming fix
-        print('start_duel received keys: ${data.keys.toList()}');
-        print('amIP1: ${widget.amIP1}');
-        print('p1Questions count: ${data['p1Questions']?.length}');
-        print('p2Questions count: ${data['p2Questions']?.length}');
 
         final rawQuestions = widget.amIP1
             ? data['p1Questions']
@@ -119,16 +112,6 @@ class _QuestionSelectionScreenState extends State<QuestionSelectionScreen> {
     });
   }
 
-  // 3/3/2026--autosubmit if time runs out before user selects 5 questions. Fills remaining slots with random inventory items.
-  // void _startTimer() {
-  //   _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-  //     if (timeLeft > 0) {
-  //       setState(() => timeLeft--);
-  //     } else {
-  //       _submitSelection();
-  //     }
-  //   });
-  // }
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (timeLeft > 0) {
@@ -145,38 +128,19 @@ class _QuestionSelectionScreenState extends State<QuestionSelectionScreen> {
             }
           }
         }
-        _submitSelection(); // Send whatever we have (now 5) to the server
+        _submitSelection();
       }
     });
   }
 
   void _submitSelection() {
     _timer?.cancel();
-    // Integration with backend: matches the 'submit_selection' event [cite: 314]
     widget.socket.emit('submit_selection', {
       'roomId': widget.roomId,
       'userId': widget.userId,
       'selectedIds': selectedIds,
     });
-    // Wait for start_duel socket event — navigation happens there
     setState(() => _isWaiting = true);
-
-    //temporary navigation to matchroom for testing without backend
-    // Future.delayed(const Duration(milliseconds: 500), () {
-    //   if (mounted) {
-    //     Navigator.pushReplacementNamed(
-    //       context,
-    //       '/matchroom',
-    //       arguments: {
-    //         'roomId': widget.roomId,
-    //         'userId': widget.userId,
-    //         'questions': widget.inventory
-    //             .take(5)
-    //             .toList(), // Just take the first 5 from inventory as dummy data
-    //       },
-    //     );
-    //   }
-    // });
   }
 
   @override
