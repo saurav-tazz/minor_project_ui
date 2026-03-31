@@ -243,7 +243,7 @@ export const initSocket = (server) => {
 
                 const difficultyMap = { noob: 'Easy', intermediate: 'Medium', pro: 'Hard' };
                 const targetDifficulty = difficultyMap[host.level] || 'Easy';
-
+                    
                 const combinedHistory = [
                     ...(host.playedQuestions || []),
                     ...(guest.playedQuestions || []),
